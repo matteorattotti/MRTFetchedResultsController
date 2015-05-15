@@ -26,9 +26,17 @@ typedef NSUInteger MRTFetchedResultsChangeType;
 /** Objects fetched from the managed object context. -performFetch: must be called before accessing fetchedObjects, otherwise a nil array will be returned */
 @property (nonatomic, retain, readonly) NSArray *fetchedObjects;
 
+/** Objects fetched from the managed object context and arranged using the filterPredicate and the sortDescriptors. 
+If filterPredicate and sortDescriptors are not set, this will return the fetchedObjects */
+@property (nonatomic, retain, readonly) NSArray *arrangedObjects;
+
 /** Managed object context and fetch request used to execute the fetch */
 @property (nonatomic, retain, readonly) NSManagedObjectContext *managedObjectContext;
 @property (nonatomic, retain, readonly) NSFetchRequest *fetchRequest;
+
+/** In memory filter and sorts, affects the arrangedObjects array */
+@property (nonatomic, strong) NSPredicate *filterPredicate;
+@property (nonatomic, copy) NSArray *sortDescriptors;
 
 /**
  Creates a new SNRFetchedResultsController object with the specified managed object context and fetch request

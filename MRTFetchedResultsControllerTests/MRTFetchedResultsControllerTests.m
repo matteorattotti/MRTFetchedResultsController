@@ -685,6 +685,170 @@
     XCTAssertEqual([fetchedResultsController indexOfObject:newObject4], 2, @"Wrong order of object after insertion");
 }
 
+#pragma mark - Arranged Objects
+
+- (void) testArrangedObjectSortDescriptors
+{
+    // Inserting a new object inside the managedObjectContext
+    Note *newObject = [NSEntityDescription insertNewObjectForEntityForName:@"Note" inManagedObjectContext:self.managedObjectContext];
+    newObject.order = @1;
+    
+    // Inserting a new object inside the managedObjectContext
+    Note *newObject2 = [NSEntityDescription insertNewObjectForEntityForName:@"Note" inManagedObjectContext:self.managedObjectContext];
+    newObject2.order = @2;
+
+    // Processing changes so the object is no longer listed in the "inserted objects"
+    [self.managedObjectContext processPendingChanges];
+
+    // Creating the fetchedResultsController
+    MRTFetchedResultsController *fetchedResultsController = [self notesFetchedResultsController];
+    [fetchedResultsController performFetch:nil];
+
+    // Setting an inverse order sort descriptors
+    NSArray *sortDescriptors = @[[NSSortDescriptor sortDescriptorWithKey:@"order" ascending:NO]];
+    [fetchedResultsController setSortDescriptors:sortDescriptors];
+    
+    // Checking correct ordering
+    XCTAssertEqual([fetchedResultsController indexOfObject:newObject2], 0, @"Wrong order of object after applying sortDescriptors");
+    XCTAssertEqual([fetchedResultsController indexOfObject:newObject],  1, @"Wrong order of object after applying sortDescriptors");
+
+    // Trying to move an object
+    newObject2.order = @0;
+    
+    // Creating a new expectation
+    XCTestExpectation *expectation = [self expectationWithDescription:@"Move of object notified"];
+    newObject2.moveExpectation = expectation;
+    
+    // Waiting for all expectations
+    [self waitForExpectationsWithTimeout:self.expectationsDefaultTimeout handler:^(NSError *error) {
+        if(error) XCTFail(@"Expectation Failed with error: %@", error);
+        
+        // Checking correct ordering
+        XCTAssertEqual([fetchedResultsController indexOfObject:newObject], 0, @"Wrong order of object after applying sortDescriptors");
+        XCTAssertEqual([fetchedResultsController indexOfObject:newObject2],  1, @"Wrong order of object after applying sortDescriptors");
+
+        // Checking number and type of events
+        [self checkExpectedNumberOfInserts:0 deletes:0 updates:0 moves:1];
+        
+        // Checking number of delegate calls
+        [self checkNumberOfWillDidChangeCalls:1];
+        
+        // Checking total number of object in the controller
+        XCTAssertEqual([fetchedResultsController count], 2, @"Number of object in the fetchedResultsController doesn't match");
+    }];
+
+}
+
+- (void) testArrangedObjectSortDescriptorsRemoval
+{
+    // Inserting a new object inside the managedObjectContext
+    Note *newObject = [NSEntityDescription insertNewObjectForEntityForName:@"Note" inManagedObjectContext:self.managedObjectContext];
+    newObject.order = @1;
+    
+    // Inserting a new object inside the managedObjectContext
+    Note *newObject2 = [NSEntityDescription insertNewObjectForEntityForName:@"Note" inManagedObjectContext:self.managedObjectContext];
+    newObject2.order = @2;
+    
+    // Creating the fetchedResultsController
+    MRTFetchedResultsController *fetchedResultsController = [self notesFetchedResultsController];
+    [fetchedResultsController performFetch:nil];
+    
+    // Setting an inverse order sort descriptors
+    NSArray *sortDescriptors = @[[NSSortDescriptor sortDescriptorWithKey:@"order" ascending:NO]];
+    [fetchedResultsController setSortDescriptors:sortDescriptors];
+    
+    // Removing sort descriptor
+    [fetchedResultsController setSortDescriptors:nil];
+    
+    // Checking correct ordering
+    XCTAssertEqual([fetchedResultsController indexOfObject:newObject], 0, @"Wrong order of object after removing sortDescriptors");
+    XCTAssertEqual([fetchedResultsController indexOfObject:newObject2],  1, @"Wrong order of object after removing sortDescriptors");
+}
+
+
+- (void) testArrangedObjectFilterPredicate
+{
+    // Inserting a new object inside the managedObjectContext
+    Note *newObject = [NSEntityDescription insertNewObjectForEntityForName:@"Note" inManagedObjectContext:self.managedObjectContext];
+    newObject.order = @1;
+    
+    // Inserting a new object inside the managedObjectContext
+    Note *newObject2 = [NSEntityDescription insertNewObjectForEntityForName:@"Note" inManagedObjectContext:self.managedObjectContext];
+    newObject2.order = @2;
+ 
+    // Inserting a new object inside the managedObjectContext
+    Note *newObject3 = [NSEntityDescription insertNewObjectForEntityForName:@"Note" inManagedObjectContext:self.managedObjectContext];
+    newObject3.order = @3;
+    
+    // Creating the fetchedResultsController
+    MRTFetchedResultsController *fetchedResultsController = [self notesFetchedResultsController];
+    [fetchedResultsController performFetch:nil];
+
+    // Creating and applying a predicate
+    NSPredicate *predicate = [NSPredicate predicateWithFormat:@"order >= %@", @2];
+    [fetchedResultsController setFilterPredicate:predicate];
+    
+    // Checking total number of object in the controller
+    XCTAssertEqual([fetchedResultsController count], 2, @"Number of object in the fetchedResultsController doesn't match");
+
+    // Checking correct ordering
+    XCTAssertEqual([fetchedResultsController indexOfObject:newObject2],  0, @"Wrong order of object after applying filter predicate");
+    XCTAssertEqual([fetchedResultsController indexOfObject:newObject3],  1, @"Wrong order of object after applying filter predicate");
+
+    // Updating the order so the object is going back into the controller
+    newObject.order = @5;
+    
+    // Creating a new expectation
+    XCTestExpectation *expectation = [self expectationWithDescription:@"Insert of object notified"];
+    newObject.insertExpectation = expectation;
+
+    // Waiting for all expectations
+    [self waitForExpectationsWithTimeout:self.expectationsDefaultTimeout handler:^(NSError *error) {
+        if(error) XCTFail(@"Expectation Failed with error: %@", error);
+        
+        // Checking correct ordering
+        XCTAssertEqual([fetchedResultsController indexOfObject:newObject2],  0, @"Wrong order of object after applying filter predicate");
+        XCTAssertEqual([fetchedResultsController indexOfObject:newObject3],  1, @"Wrong order of object after applying filter predicate");
+        XCTAssertEqual([fetchedResultsController indexOfObject:newObject],  2, @"Wrong order of object after applying filter predicate");
+        
+        // Checking total number of object in the controller
+        XCTAssertEqual([fetchedResultsController count], 3, @"Number of object in the fetchedResultsController doesn't match");
+    }];
+}
+
+- (void) testArrangedObjectFilterPredicateRemoval
+{
+    // Inserting a new object inside the managedObjectContext
+    Note *newObject = [NSEntityDescription insertNewObjectForEntityForName:@"Note" inManagedObjectContext:self.managedObjectContext];
+    newObject.order = @1;
+    
+    // Inserting a new object inside the managedObjectContext
+    Note *newObject2 = [NSEntityDescription insertNewObjectForEntityForName:@"Note" inManagedObjectContext:self.managedObjectContext];
+    newObject2.order = @2;
+    
+    // Inserting a new object inside the managedObjectContext
+    Note *newObject3 = [NSEntityDescription insertNewObjectForEntityForName:@"Note" inManagedObjectContext:self.managedObjectContext];
+    newObject3.order = @3;
+    
+    // Creating the fetchedResultsController
+    MRTFetchedResultsController *fetchedResultsController = [self notesFetchedResultsController];
+    [fetchedResultsController performFetch:nil];
+    
+    // Creating and applying a predicate
+    NSPredicate *predicate = [NSPredicate predicateWithFormat:@"order >= %@", @2];
+    [fetchedResultsController setFilterPredicate:predicate];
+
+    // Removing predicate
+    [fetchedResultsController setFilterPredicate:nil];
+
+    // Checking total number of object in the controller
+    XCTAssertEqual([fetchedResultsController count], 3, @"Number of object in the fetchedResultsController doesn't match");
+
+    // Checking correct ordering
+    XCTAssertEqual([fetchedResultsController indexOfObject:newObject],  0, @"Wrong order of object after removing filter predicate");
+    XCTAssertEqual([fetchedResultsController indexOfObject:newObject2],  1, @"Wrong order of object after removing filter predicate");
+    XCTAssertEqual([fetchedResultsController indexOfObject:newObject3],  2, @"Wrong order of object after removing filter predicate");
+}
 
 #pragma mark - MRTFetchedResultsController utils
 
