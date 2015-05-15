@@ -22,6 +22,9 @@
 @property (nonatomic) NSUInteger numberOfUpdates;
 @property (nonatomic) NSUInteger numberOfMoves;
 
+@property (nonatomic) NSUInteger numberOfWillChangeContext;
+@property (nonatomic) NSUInteger numberOfDidChangeContext;
+
 @end
 
 @implementation MRTFetchedResultsControllerTests
@@ -39,6 +42,9 @@
     self.numberOfDeletes = 0;
     self.numberOfUpdates = 0;
     self.numberOfMoves   = 0;
+    
+    self.numberOfWillChangeContext = 0;
+    self.numberOfDidChangeContext = 0;
 }
 
 - (void) setupCoreData
@@ -84,10 +90,50 @@
 
         // Checking number and type of events
         [self checkExpectedNumberOfInserts:1 deletes:0 updates:0 moves:0];
+        
+        // Checking number of delegate calls
+        [self checkNumberOfWillDidChangeCalls:1];
 
         // Checking total number of object in the controller
         XCTAssertEqual([fetchedResultsController count], 1, @"Number of object in the fetchedResultsController doesn't match");
     }];
+}
+
+
+- (void) testInsertionOrder
+{
+    // Creating the fetchedResultsController
+    MRTFetchedResultsController *fetchedResultsController = [self notesFetchedResultsController];
+    [fetchedResultsController performFetch:nil];
+    
+    // Inserting a new object inside the managedObjectContext
+    Note *newObject = [NSEntityDescription insertNewObjectForEntityForName:@"Note" inManagedObjectContext:self.managedObjectContext];
+    newObject.order = @1;
+
+    // Inserting a new object inside the managedObjectContext
+    Note *newObject2 = [NSEntityDescription insertNewObjectForEntityForName:@"Note" inManagedObjectContext:self.managedObjectContext];
+    newObject2.order = @2;
+
+    // Inserting a new object inside the managedObjectContext
+    Note *newObject3 = [NSEntityDescription insertNewObjectForEntityForName:@"Note" inManagedObjectContext:self.managedObjectContext];
+    newObject3.order = @0;
+
+    // Waiting for the delegate notifications
+    CFRunLoopRunInMode( kCFRunLoopDefaultMode, self.expectationsDefaultTimeout, NO );
+    
+    // Checking number and type of events
+    [self checkExpectedNumberOfInserts:3 deletes:0 updates:0 moves:0];
+    
+    // Checking number of delegate calls
+    [self checkNumberOfWillDidChangeCalls:1];
+    
+    // Checking total number of object in the controller
+    XCTAssertEqual([fetchedResultsController count], 3, @"Number of object in the fetchedResultsController doesn't match");
+
+    // Checking correct ordering
+    XCTAssertEqual([fetchedResultsController indexOfObject:newObject], 1, @"Wrong order of object after insertion");
+    XCTAssertEqual([fetchedResultsController indexOfObject:newObject2], 2, @"Wrong order of object after insertion");
+    XCTAssertEqual([fetchedResultsController indexOfObject:newObject3], 0, @"Wrong order of object after insertion");
 }
 
 
@@ -113,6 +159,9 @@
         // Checking number and type of events
         [self checkExpectedNumberOfInserts:1 deletes:0 updates:0 moves:0];
 
+        // Checking number of delegate calls
+        [self checkNumberOfWillDidChangeCalls:1];
+        
         // Checking total number of object in the controller
         XCTAssertEqual([fetchedResultsController count], 1, @"Number of object in the fetchedResultsController doesn't match");
     }];
@@ -133,6 +182,9 @@
 
     // Checking number and type of events
     [self checkExpectedNumberOfInserts:0 deletes:0 updates:0 moves:0];
+    
+    // Checking number of delegate calls
+    [self checkNumberOfWillDidChangeCalls:0];
     
     // Checking total number of object in the controller
     XCTAssertEqual([fetchedResultsController count], 0, @"Number of object in the fetchedResultsController doesn't match");
@@ -166,6 +218,9 @@
         
         // Checking number and type of events
         [self checkExpectedNumberOfInserts:0 deletes:0 updates:1 moves:0];
+        
+        // Checking number of delegate calls
+        [self checkNumberOfWillDidChangeCalls:1];
         
         // Checking total number of object in the controller
         XCTAssertEqual([fetchedResultsController count], 1, @"Number of object in the fetchedResultsController doesn't match");
@@ -202,6 +257,9 @@
         // Checking number and type of events
         [self checkExpectedNumberOfInserts:1 deletes:0 updates:0 moves:0];
         
+        // Checking number of delegate calls
+        [self checkNumberOfWillDidChangeCalls:1];
+        
         // Checking total number of object in the controller
         XCTAssertEqual([fetchedResultsController count], 1, @"Number of object in the fetchedResultsController doesn't match");
     }];
@@ -237,6 +295,9 @@
         // Checking number and type of events
         [self checkExpectedNumberOfInserts:0 deletes:1 updates:0 moves:0];
         
+        // Checking number of delegate calls
+        [self checkNumberOfWillDidChangeCalls:1];
+
         // Checking total number of object in the controller
         XCTAssertEqual([fetchedResultsController count], 0, @"Number of object in the fetchedResultsController doesn't match");
     }];
@@ -270,9 +331,54 @@
         // Checking number and type of events
         [self checkExpectedNumberOfInserts:0 deletes:1 updates:0 moves:0];
         
+        // Checking number of delegate calls
+        [self checkNumberOfWillDidChangeCalls:1];
+
         // Checking total number of object in the controller
         XCTAssertEqual([fetchedResultsController count], 0, @"Number of object in the fetchedResultsController doesn't match");
     }];
+}
+
+- (void) testDeletionOrder
+{
+    // Inserting a new object inside the managedObjectContext
+    Note *newObject = [NSEntityDescription insertNewObjectForEntityForName:@"Note" inManagedObjectContext:self.managedObjectContext];
+    newObject.order = @0;
+    
+    // Inserting a new object inside the managedObjectContext
+    Note *newObject2 = [NSEntityDescription insertNewObjectForEntityForName:@"Note" inManagedObjectContext:self.managedObjectContext];
+    newObject2.order = @1;
+    
+    // Inserting a new object inside the managedObjectContext
+    Note *newObject3 = [NSEntityDescription insertNewObjectForEntityForName:@"Note" inManagedObjectContext:self.managedObjectContext];
+    newObject3.order = @2;
+    
+    // Processing changes so the object is no longer listed in the "inserted objects"
+    [self.managedObjectContext processPendingChanges];
+
+    // Creating the fetchedResultsController
+    MRTFetchedResultsController *fetchedResultsController = [self notesFetchedResultsController];
+    [fetchedResultsController performFetch:nil];
+    
+    // Deleting the first object
+    [self.managedObjectContext deleteObject:newObject];
+
+    // Waiting for the delegate notifications
+    CFRunLoopRunInMode( kCFRunLoopDefaultMode, self.expectationsDefaultTimeout, NO );
+    
+    // Checking number and type of events
+    [self checkExpectedNumberOfInserts:0 deletes:1 updates:0 moves:0];
+    
+    // Checking number of delegate calls
+    [self checkNumberOfWillDidChangeCalls:1];
+
+    // Checking total number of object in the controller
+    XCTAssertEqual([fetchedResultsController count], 2, @"Number of object in the fetchedResultsController doesn't match");
+    
+    // Checking correct ordering
+    XCTAssertEqual([fetchedResultsController indexOfObject:newObject], NSNotFound, @"Wrong order of object after insertion");
+    XCTAssertEqual([fetchedResultsController indexOfObject:newObject2], 0, @"Wrong order of object after insertion");
+    XCTAssertEqual([fetchedResultsController indexOfObject:newObject3], 1, @"Wrong order of object after insertion");
 }
 
 - (void) testDeletionWithPredicateMatchedObject
@@ -304,6 +410,9 @@
         // Checking number and type of events
         [self checkExpectedNumberOfInserts:0 deletes:1 updates:0 moves:0];
         
+        // Checking number of delegate calls
+        [self checkNumberOfWillDidChangeCalls:1];
+
         // Checking total number of object in the controller
         XCTAssertEqual([fetchedResultsController count], 0, @"Number of object in the fetchedResultsController doesn't match");
     }];
@@ -331,6 +440,9 @@
     
     // Checking number and type of events
     [self checkExpectedNumberOfInserts:0 deletes:0 updates:0 moves:0];
+    
+    // Checking number of delegate calls
+    [self checkNumberOfWillDidChangeCalls:0];
     
     // Checking total number of object in the controller
     XCTAssertEqual([fetchedResultsController count], 0, @"Number of object in the fetchedResultsController doesn't match");
@@ -371,6 +483,9 @@
         // Checking number and type of events
         [self checkExpectedNumberOfInserts:0 deletes:0 updates:0 moves:1];
         
+        // Checking number of delegate calls
+        [self checkNumberOfWillDidChangeCalls:1];
+
         // Checking total number of object in the controller
         XCTAssertEqual([fetchedResultsController count], 2, @"Number of object in the fetchedResultsController doesn't match");
     }];
@@ -405,16 +520,173 @@
     // Waiting for all expectations
     [self waitForExpectationsWithTimeout:self.expectationsDefaultTimeout handler:^(NSError *error) {
         if(error) XCTFail(@"Expectation Failed with error: %@", error);
-
+        
         // Checking number and type of events
         [self checkExpectedNumberOfInserts:0 deletes:0 updates:1 moves:0];
+        
+        // Checking number of delegate calls
+        [self checkNumberOfWillDidChangeCalls:1];
 
         // Checking total number of object in the controller
         XCTAssertEqual([fetchedResultsController count], 2, @"Number of object in the fetchedResultsController doesn't match");
     }];
 }
 
-#pragma mark - MRTFetchedResultsController comodities
+
+- (void) testMoveWithPredicateMatchedObject
+{
+    
+    // Inserting a new object inside the managedObjectContext
+    Note *newObject = [NSEntityDescription insertNewObjectForEntityForName:@"Note" inManagedObjectContext:self.managedObjectContext];
+    newObject.order = @1;
+    newObject.trashed = @NO;
+    
+    Note *newObject2 = [NSEntityDescription insertNewObjectForEntityForName:@"Note" inManagedObjectContext:self.managedObjectContext];
+    newObject2.order = @2;
+    newObject2.trashed = @NO;
+    
+    // Processing changes so the object is no longer listed in the "inserted objects"
+    [self.managedObjectContext processPendingChanges];
+    
+    // Creating the fetchedResultsController
+    MRTFetchedResultsController *fetchedResultsController = [self untrashedNotesFetchedResultsController];
+    [fetchedResultsController performFetch:nil];
+
+    // Changing order
+    newObject2.order = @0;
+    
+    // Creating a new expectation
+    XCTestExpectation *expectation = [self expectationWithDescription:@"Move of object notified"];
+    newObject2.moveExpectation = expectation;
+    
+    // Waiting for all expectations
+    [self waitForExpectationsWithTimeout:self.expectationsDefaultTimeout handler:^(NSError *error) {
+        if(error) XCTFail(@"Expectation Failed with error: %@", error);
+        
+        // Checking number and type of events
+        [self checkExpectedNumberOfInserts:0 deletes:0 updates:0 moves:1];
+        
+        // Checking number of delegate calls
+        [self checkNumberOfWillDidChangeCalls:1];
+
+        // Checking total number of object in the controller
+        XCTAssertEqual([fetchedResultsController count], 2, @"Number of object in the fetchedResultsController doesn't match");
+    }];
+}
+
+- (void) testMoveWithPredicateUnmatchedObject
+{
+    
+    // Inserting a new object inside the managedObjectContext
+    Note *newObject = [NSEntityDescription insertNewObjectForEntityForName:@"Note" inManagedObjectContext:self.managedObjectContext];
+    newObject.order = @1;
+    newObject.trashed = @NO;
+    
+    Note *newObject2 = [NSEntityDescription insertNewObjectForEntityForName:@"Note" inManagedObjectContext:self.managedObjectContext];
+    newObject2.order = @2;
+    newObject2.trashed = @YES;
+    
+    // Processing changes so the object is no longer listed in the "inserted objects"
+    [self.managedObjectContext processPendingChanges];
+    
+    // Creating the fetchedResultsController
+    MRTFetchedResultsController *fetchedResultsController = [self untrashedNotesFetchedResultsController];
+    [fetchedResultsController performFetch:nil];
+    
+    // Changing order
+    newObject2.order = @0;
+    
+    CFRunLoopRunInMode( kCFRunLoopDefaultMode, self.expectationsDefaultTimeout, NO );
+    
+    // Checking number and type of events
+    [self checkExpectedNumberOfInserts:0 deletes:0 updates:0 moves:0];
+    
+    // Checking number of delegate calls
+    [self checkNumberOfWillDidChangeCalls:0];
+
+    // Checking total number of object in the controller
+    XCTAssertEqual([fetchedResultsController count], 1, @"Number of object in the fetchedResultsController doesn't match");
+}
+
+#pragma mark - Multiply Changes
+
+- (void) testMultipleTypeOfChanges
+{
+    /*
+     Initial status:
+     "empty"
+     
+     Status after first group of changes:
+     newObject (order 1) -> insert
+     newObject2 (order 2) -> insert
+     
+     Status aftersSecond group of changes:
+     newObject2 (order 0) -> move
+     newObject (order 1, "updated text") -> update
+     newObject3 (order 3) -> insert/deleted (won't fire any change)
+     newObject4 (order 4) -> insert
+     
+     Final Status:
+     newObject2 (order 0)
+     newObject (order 1, "updated text")
+     newObject4 (order 4)
+     */
+    
+    // Creating the fetchedResultsController
+    MRTFetchedResultsController *fetchedResultsController = [self notesFetchedResultsController];
+    [fetchedResultsController performFetch:nil];
+    
+    // Inserting a new object inside the managedObjectContext
+    Note *newObject = [NSEntityDescription insertNewObjectForEntityForName:@"Note" inManagedObjectContext:self.managedObjectContext];
+    newObject.order = @1;
+    
+    // Inserting a new object inside the managedObjectContext
+    Note *newObject2 = [NSEntityDescription insertNewObjectForEntityForName:@"Note" inManagedObjectContext:self.managedObjectContext];
+    newObject2.order = @2;
+    
+    // Processing changes so the object is no longer listed in the "inserted objects"
+    [self.managedObjectContext processPendingChanges];
+    
+    // Waiting for the delegate notifications
+    CFRunLoopRunInMode( kCFRunLoopDefaultMode, self.expectationsDefaultTimeout, NO );
+    
+    // Inserting a new object inside the managedObjectContext
+    Note *newObject3 = [NSEntityDescription insertNewObjectForEntityForName:@"Note" inManagedObjectContext:self.managedObjectContext];
+    newObject3.order = @3;
+    
+    // Inserting a new object inside the managedObjectContext
+    Note *newObject4 = [NSEntityDescription insertNewObjectForEntityForName:@"Note" inManagedObjectContext:self.managedObjectContext];
+    newObject4.order = @4;
+    
+    // Updating
+    newObject.text = @"updated text";
+    
+    // Moving
+    newObject2.order = @0;
+    
+    // Deleting
+    [self.managedObjectContext deleteObject:newObject3];
+    
+    // Waiting for the delegate notifications
+    CFRunLoopRunInMode( kCFRunLoopDefaultMode, self.expectationsDefaultTimeout, NO );
+    
+    // Checking number and type of events
+    [self checkExpectedNumberOfInserts:3 deletes:0 updates:1 moves:1];
+    
+    // Checking number of delegate calls
+    [self checkNumberOfWillDidChangeCalls:2];
+    
+    // Checking total number of object in the controller
+    XCTAssertEqual([fetchedResultsController count], 3, @"Number of object in the fetchedResultsController doesn't match");
+    
+    // Checking correct ordering
+    XCTAssertEqual([fetchedResultsController indexOfObject:newObject2], 0, @"Wrong order of object after insertion");
+    XCTAssertEqual([fetchedResultsController indexOfObject:newObject],  1, @"Wrong order of object after insertion");
+    XCTAssertEqual([fetchedResultsController indexOfObject:newObject4], 2, @"Wrong order of object after insertion");
+}
+
+
+#pragma mark - MRTFetchedResultsController utils
 
 - (MRTFetchedResultsController *) notesFetchedResultsController
 {
@@ -452,7 +724,24 @@
     XCTAssertEqual(self.numberOfMoves,   moves  , @"Number of moves doesn't match");
 }
 
+- (void) checkNumberOfWillDidChangeCalls: (NSUInteger) numberOfCalls
+{
+    XCTAssertEqual(self.numberOfWillChangeContext, numberOfCalls, @"Number of willChangeContext doesn't match");
+    XCTAssertEqual(self.numberOfDidChangeContext, numberOfCalls, @"Number of didChangeContext doesn't match");
+}
+
 #pragma mark - MRTFetchedResultsControllerDelegate
+
+- (void)controllerWillChangeContent:(MRTFetchedResultsController *)controller
+{
+    self.numberOfWillChangeContext++;
+}
+
+- (void)controllerDidChangeContent:(MRTFetchedResultsController *)controller
+{
+    self.numberOfDidChangeContext++;
+}
+
 
 - (void)controller:(MRTFetchedResultsController *)controller didChangeObject:(id)anObject atIndex:(NSUInteger)index forChangeType:(MRTFetchedResultsChangeType)type newIndex:(NSUInteger)newIndex
 {

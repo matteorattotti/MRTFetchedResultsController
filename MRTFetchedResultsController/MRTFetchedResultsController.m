@@ -186,7 +186,7 @@
                 NSMutableSet *keySet = [NSMutableSet set];
                 
                 [keySet addObjectsFromArray:[[object changedValuesForCurrentEvent] allKeys]];
-                [keySet addObjectsFromArray:[[object changedValues] allKeys]];
+                //[keySet addObjectsFromArray:[[object changedValues] allKeys]];
                 
                 NSArray *keys = [keySet allObjects];
                 
