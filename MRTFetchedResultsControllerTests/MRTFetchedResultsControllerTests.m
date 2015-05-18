@@ -14,6 +14,7 @@
 @interface MRTFetchedResultsControllerTests : XCTestCase <MRTFetchedResultsControllerDelegate>
 
 @property (strong) NSManagedObjectContext *managedObjectContext;
+@property (strong) NSManagedObjectContext *privateManagedObjectContext;
 
 @property (nonatomic) CGFloat expectationsDefaultTimeout;
 
@@ -59,6 +60,18 @@
     
     self.managedObjectContext = [[NSManagedObjectContext alloc] initWithConcurrencyType:NSMainQueueConcurrencyType];
     self.managedObjectContext.persistentStoreCoordinator = coordinator;
+}
+
+- (void) setupPrivateManagedObjectContext
+{
+    self.privateManagedObjectContext = [[NSManagedObjectContext alloc] initWithConcurrencyType:NSPrivateQueueConcurrencyType];
+    self.privateManagedObjectContext.persistentStoreCoordinator = self.managedObjectContext.persistentStoreCoordinator;
+    [[NSNotificationCenter defaultCenter] addObserverForName:NSManagedObjectContextDidSaveNotification object:self.privateManagedObjectContext queue:nil usingBlock:^(NSNotification *note) {
+        [self.managedObjectContext performBlock:^{
+            [self.managedObjectContext mergeChangesFromContextDidSaveNotification:note];
+        }];
+
+    }];
 }
 
 #pragma mark - Tear Down
@@ -607,6 +620,98 @@
     // Checking total number of object in the controller
     XCTAssertEqual([fetchedResultsController count], 1, @"Number of object in the fetchedResultsController doesn't match");
 }
+
+#pragma mark - Refresh
+
+// Objects will be listed in the NSRefreshedObjectsKey when they are updated in another NSManagedObjectContext and merged with the
+// mergeChangesFromContextDidSaveNotification in the "main" context
+- (void) testRefresh
+{
+    // Inserting a new object inside the managedObjectContext
+    Note *newObject = [NSEntityDescription insertNewObjectForEntityForName:@"Note" inManagedObjectContext:self.managedObjectContext];
+    newObject.text = @"initial text";
+    
+    // Creating a new expectation
+    XCTestExpectation *expectation = [self expectationWithDescription:@"update of object notified"];
+    newObject.updateExpectation = expectation;
+
+    // Saving the context (in order to get the final objectID)
+    [self.managedObjectContext save:nil];
+
+    // Setting up a offthread MOC to update the object
+    [self setupPrivateManagedObjectContext];
+    
+    __block NSManagedObjectID *objectID = [newObject objectID];
+    
+    // Creating the fetchedResultsController
+    MRTFetchedResultsController *fetchedResultsController = [self notesFetchedResultsController];
+    [fetchedResultsController performFetch:nil];
+    
+    // Updating the object on the private MOC
+    [self.privateManagedObjectContext performBlockAndWait:^{
+        Note *privateNote = (Note *)[self.privateManagedObjectContext existingObjectWithID:objectID error:nil];
+        privateNote.text = @"updated text";
+        [self.privateManagedObjectContext save:nil];
+        
+    }];
+    
+    // Waiting for all expectations
+    [self waitForExpectationsWithTimeout:self.expectationsDefaultTimeout handler:^(NSError *error) {
+        if(error) XCTFail(@"Expectation Failed with error: %@", error);
+       
+        // Checking number and type of events
+        [self checkExpectedNumberOfInserts:0 deletes:0 updates:1 moves:0];
+
+    }];
+}
+
+- (void) testRefreshOrder
+{
+    Note *newObject = [NSEntityDescription insertNewObjectForEntityForName:@"Note" inManagedObjectContext:self.managedObjectContext];
+    newObject.order = @0;
+
+    Note *newObject2 = [NSEntityDescription insertNewObjectForEntityForName:@"Note" inManagedObjectContext:self.managedObjectContext];
+    newObject2.order = @1;
+
+    Note *newObject3 = [NSEntityDescription insertNewObjectForEntityForName:@"Note" inManagedObjectContext:self.managedObjectContext];
+    newObject3.order = @2;
+
+    
+    // Creating a new expectation
+    XCTestExpectation *expectation = [self expectationWithDescription:@"move of object notified"];
+    newObject.moveExpectation = expectation;
+    
+    // Saving the context (in order to get the final objectID)
+    [self.managedObjectContext save:nil];
+    
+    // Setting up a offthread MOC to update the object
+    [self setupPrivateManagedObjectContext];
+    
+    __block NSManagedObjectID *objectID = [newObject objectID];
+    
+    // Creating the fetchedResultsController
+    MRTFetchedResultsController *fetchedResultsController = [self notesFetchedResultsController];
+    [fetchedResultsController performFetch:nil];
+    
+    // Updating the object on the private MOC
+    [self.privateManagedObjectContext performBlockAndWait:^{
+        Note *privateNote = (Note *)[self.privateManagedObjectContext existingObjectWithID:objectID error:nil];
+        privateNote.order = @3;
+        [self.privateManagedObjectContext save:nil];
+        
+    }];
+    
+    // Waiting for all expectations
+    [self waitForExpectationsWithTimeout:self.expectationsDefaultTimeout handler:^(NSError *error) {
+        if(error) XCTFail(@"Expectation Failed with error: %@", error);
+        
+        // Checking number and type of events
+        [self checkExpectedNumberOfInserts:0 deletes:0 updates:0 moves:1];
+        
+    }];
+
+}
+
 
 #pragma mark - Multiply Changes
 

@@ -118,6 +118,15 @@
     [self updateArrangedObjects];
 }
 
+- (NSArray *) arrangedObjects
+{
+    if (_arrangedObjects) {
+        return _arrangedObjects;
+    }
+    
+    return _fetchedObjects;
+}
+
 - (void) updateArrangedObjects
 {
 
@@ -156,9 +165,9 @@
     
     // Array are way faster to enumerate than sets
     NSArray *insertedObjects = [[notification.userInfo valueForKey:NSInsertedObjectsKey] allObjects];
-    NSArray *updatedObjects = [[notification.userInfo valueForKey:NSUpdatedObjectsKey] allObjects];
     NSArray *deletedObjects = [[notification.userInfo valueForKey:NSDeletedObjectsKey] allObjects];
-    
+    NSArray *updatedObjects = [[notification.userInfo valueForKey:NSUpdatedObjectsKey] allObjects];
+    NSArray *refreshedObjects = [[notification.userInfo valueForKey:NSRefreshedObjectsKey] allObjects];
     
     BOOL notifyDelegateForFetchedObjects = YES;
     
@@ -170,7 +179,8 @@
         NSMutableArray *inserted = [NSMutableArray array];
 
         [self evaluateDeletedObjects:deletedObjects inContainer:_arrangedObjects fetchRequest:self.arrangedObjectInMemoryFetchRequest notifyDelegate:YES];
-        [self evaluateUpdatedObjects:updatedObjects inContainer:_arrangedObjects fetchRequest:self.arrangedObjectInMemoryFetchRequest notifyDelegate:YES newlyInsertedObjects:inserted];
+        [self evaluateUpdatedObjects:updatedObjects inContainer:_arrangedObjects fetchRequest:self.arrangedObjectInMemoryFetchRequest notifyDelegate:YES newlyInsertedObjects:inserted forceResort:NO];
+        [self evaluateUpdatedObjects:refreshedObjects inContainer:_arrangedObjects fetchRequest:self.arrangedObjectInMemoryFetchRequest notifyDelegate:YES newlyInsertedObjects:inserted forceResort:YES];
         [self evaluateInsertedObjects:insertedObjects inContainer:_arrangedObjects fetchRequest:self.arrangedObjectInMemoryFetchRequest notifyDelegate:YES newlyInsertedObjects:inserted];
     }
     
@@ -179,14 +189,14 @@
 
     // Evaluating for fetchedObjects
     [self evaluateDeletedObjects:deletedObjects inContainer:_fetchedObjects fetchRequest:self.fetchRequest notifyDelegate:notifyDelegateForFetchedObjects];
-    [self evaluateUpdatedObjects:updatedObjects inContainer:_fetchedObjects fetchRequest:self.fetchRequest notifyDelegate:notifyDelegateForFetchedObjects newlyInsertedObjects:inserted];
+    [self evaluateUpdatedObjects:updatedObjects inContainer:_fetchedObjects fetchRequest:self.fetchRequest notifyDelegate:notifyDelegateForFetchedObjects newlyInsertedObjects:inserted forceResort:NO];
+    [self evaluateUpdatedObjects:refreshedObjects inContainer:_fetchedObjects fetchRequest:self.fetchRequest notifyDelegate:notifyDelegateForFetchedObjects newlyInsertedObjects:inserted forceResort:YES];
     [self evaluateInsertedObjects:insertedObjects inContainer:_fetchedObjects fetchRequest:self.fetchRequest notifyDelegate:notifyDelegateForFetchedObjects newlyInsertedObjects:inserted];
     
     // if delegateWillChangeContent: was called then delegateDidChangeContent: must also be called
     if (didCallDelegateWillChangeContent) {
         [self delegateDidChangeContent];
     }
-
 }
 
 - (void) evaluateDeletedObjects: (NSArray *) deletedObjects
@@ -221,6 +231,7 @@
                    fetchRequest: (NSFetchRequest *) fetchRequest
                  notifyDelegate: (BOOL) notifyDelegate
            newlyInsertedObjects: (NSMutableArray *) newlyInsertedObjects
+                    forceResort: (BOOL) forceResort
 {
     NSEntityDescription *entity = [fetchRequest entity];
     NSPredicate *predicate = [fetchRequest predicate];
@@ -257,7 +268,9 @@
             // Check if the object's updated keys are in the sort keys
             // This means that the sorting would have to be updated
             BOOL sortingChanged = NO;
-            if ([sortKeys count]) {
+            
+            // Refreshed objects doesn't seem to carry the "changedValuesForCurrentEvent" so the we are forced to resort
+            if ([sortKeys count] && !forceResort) {
                 NSMutableSet *keySet = [NSMutableSet set];
                 
                 [keySet addObjectsFromArray:[[object changedValuesForCurrentEvent] allKeys]];
@@ -272,7 +285,8 @@
                     }
                 }
             }
-            if (sortingChanged) {
+            
+            if (sortingChanged || forceResort) {
                 // Create a wrapper object that keeps track of the original index for later
                 MRTFetchedResultsUpdate *update = [MRTFetchedResultsUpdate new];
                 update.originalIndex = objectIndex;
@@ -289,7 +303,7 @@
         [container sortUsingDescriptors:sortDescriptors];
         for (MRTFetchedResultsUpdate *update in updated) {
             // Find out then new index of the object in the content array
-            NSUInteger newIndex = [_fetchedObjects indexOfObject:update.object];
+            NSUInteger newIndex = [container indexOfObject:update.object];
             // If the new index is different from the old one
             if (update.originalIndex != newIndex && notifyDelegate) {
                 [self delegateDidChangeObject:update.object atIndex:update.originalIndex forChangeType:MRTFetchedResultsChangeMove newIndex:newIndex];
@@ -301,6 +315,8 @@
         }
     }
 }
+
+
 
 - (void) evaluateInsertedObjects: (NSArray *) insertedObjects
                      inContainer: (NSMutableArray *) container
