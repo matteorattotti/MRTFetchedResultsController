@@ -215,6 +215,9 @@
         NSUInteger index = [container indexOfObject:object];
         if (index == NSNotFound) { continue; }
         
+        // Delegate notification
+        if (notifyDelegate) { [self delegateWillChangeContent]; }
+        
         // Removing object
         [container removeObjectAtIndex:index];
 
@@ -254,8 +257,15 @@
         // If the content array already contains the object but the update resulted in the predicate
         // no longer evaluating to TRUE, then it needs to be removed
         if (containsObject && !predicateEvaluates) {
+
+            // Delegate notification
+            if (notifyDelegate) { [self delegateWillChangeContent]; }
+
             [container removeObjectAtIndex:objectIndex];
-            if(notifyDelegate) [self delegateDidChangeObject:object atIndex:objectIndex forChangeType:MRTFetchedResultsChangeDelete newIndex:NSNotFound];
+            
+            // Delegate notification
+            if(notifyDelegate) { [self delegateDidChangeObject:object atIndex:objectIndex forChangeType:MRTFetchedResultsChangeDelete newIndex:NSNotFound]; }
+
         }
         
         // If the content array does not contain the object but the object's update resulted in the predicate now
@@ -294,12 +304,14 @@
                 [updated addObject:update];
             } else {
                 // If there's no change in sorting then just update the object as-is
-                if (notifyDelegate) [self delegateDidChangeObject:object atIndex:objectIndex forChangeType:MRTFetchedResultsChangeUpdate newIndex:objectIndex];
+                if (notifyDelegate) { [self delegateWillChangeContent]; }
+                if (notifyDelegate) { [self delegateDidChangeObject:object atIndex:objectIndex forChangeType:MRTFetchedResultsChangeUpdate newIndex:objectIndex]; }
             }
         }
     }
     // If there were updated objects that changed the sorting then resort and notify the delegate of changes
     if ([updated count] && [sortDescriptors count]) {
+        if (notifyDelegate) { [self delegateWillChangeContent]; }
         [container sortUsingDescriptors:sortDescriptors];
         for (MRTFetchedResultsUpdate *update in updated) {
             // Find out then new index of the object in the content array
@@ -338,6 +350,10 @@
     // If there were inserted objects then insert them into the content array and resort
     NSUInteger insertedCount = [newlyInsertedObjects count];
     if (insertedCount) {
+        
+        // Delegate notification
+        if (notifyDelegate) { [self delegateWillChangeContent]; }
+        
         // Dump the inserted objects into the content array
         [container addObjectsFromArray:newlyInsertedObjects];
         
@@ -373,8 +389,9 @@
 
 - (void)delegateWillChangeContent
 {
-    if (delegateHas.delegateHasWillChangeContent) {
+    if (delegateHas.delegateHasWillChangeContent && !didCallDelegateWillChangeContent) {
         [self.delegate controllerWillChangeContent:self];
+        didCallDelegateWillChangeContent = YES;
     }
 }
 
@@ -388,10 +405,6 @@
 - (void)delegateDidChangeObject:(id)anObject atIndex:(NSUInteger)index forChangeType:(MRTFetchedResultsChangeType)type newIndex:(NSUInteger)newIndex
 {
     // NSLog(@"Changing object: %@\nAt index: %lu\nChange type: %d\nNew index: %lu", anObject, index, (int)type, newIndex);
-    if (!didCallDelegateWillChangeContent) {
-        [self delegateWillChangeContent];
-        didCallDelegateWillChangeContent = YES;
-    }
     if (delegateHas.delegateHasDidChangeObject) {
         [self.delegate controller:self didChangeObject:anObject atIndex:index forChangeType:type newIndex:newIndex];
     }
