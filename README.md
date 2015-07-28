@@ -1,6 +1,6 @@
 ## MRTFetchedResultsController
 
-`MRTFetchedResultsController` provideds automatic Core Data change tracking and it's a port of `NSFetchedResultsController` for OS X. It performs many of the same tasks in relation to managing results from a Core Data fetch and notifying a delegate when objects are inserted, deleted, updated, or moved in order to update the UI.
+`MRTFetchedResultsController` provideds automatic Core Data change tracking and it's a port of `NSFetchedResultsController` for OS X (but it works on iOS too). It performs many of the same tasks in relation to managing results from a Core Data fetch and notifying a delegate when objects are inserted, deleted, updated, or moved in order to update the UI.
 
 ### Installation
 `MRTFetchedResultsController` is a single class with no dependencies, just download and drag the `MRTFetchedResultsController.{h,m}` files in your Xcode project. All the classes require ARC or you will have to compile it with the `-fobjc-arc` flag.
