@@ -27,6 +27,7 @@ request.predicate = [NSPredicate predicateWithFormat:@"deleted = NO"];
 
 // Creating the MRTFetchedResultsController
 MRTFetchedResultsController *fetchedResultsController = [[MRTFetchedResultsController alloc] initWithManagedObjectContext:context fetchRequest:request];
+fetchedResultsController.delegate = self;
 
 // Retrieving the objects
 NSError *error = nil;
@@ -35,7 +36,7 @@ if (error) {
     NSLog(@"Unresolved error: %@ %@", error, [error userInfo]);
 }
 else {
-  NSLog(@"fetched objects %@", fetchedResultsController.fetchedObjects)
+    NSLog(@"fetched objects %@", fetchedResultsController.fetchedObjects);
 }
 ```
 
