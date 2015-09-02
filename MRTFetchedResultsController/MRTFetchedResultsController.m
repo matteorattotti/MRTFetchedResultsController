@@ -8,12 +8,12 @@
 
 #import "MRTFetchedResultsController.h"
 
+const NSString *SFNewContainerKey = @"SFNewContainerKey";
+
 @interface MRTFetchedResultsController ()
 {
     NSMutableArray *_fetchedObjects;
     NSMutableArray *_arrangedObjects;
-
-    BOOL didCallDelegateWillChangeContent;
     
     struct {
         BOOL delegateHasWillChangeContent;
@@ -26,12 +26,6 @@
 
 @end
 
-@interface MRTFetchedResultsUpdate : NSObject
-
-@property (nonatomic, retain) NSManagedObject *object;
-@property (nonatomic, assign) NSUInteger originalIndex;
-
-@end
 
 @implementation MRTFetchedResultsController
 
@@ -161,7 +155,6 @@
 - (void)managedObjectContextObjectsDidChange:(NSNotification*)notification
 {
     if (!self.fetchRequest) { return; }
-    didCallDelegateWillChangeContent = NO;
     
     // Array are way faster to enumerate than sets
     NSArray *insertedObjects = [[notification.userInfo valueForKey:NSInsertedObjectsKey] allObjects];
@@ -169,229 +162,189 @@
     NSArray *updatedObjects = [[notification.userInfo valueForKey:NSUpdatedObjectsKey] allObjects];
     NSArray *refreshedObjects = [[notification.userInfo valueForKey:NSRefreshedObjectsKey] allObjects];
     
-    BOOL notifyDelegateForFetchedObjects = YES;
+    NSMutableArray *updatedAndRefreshedObject = [NSMutableArray array];
+    [updatedAndRefreshedObject addObjectsFromArray:updatedObjects];
+    [updatedAndRefreshedObject addObjectsFromArray:refreshedObjects];
+
     
+    BOOL notifyDelegateForFetchedObjects = YES;
+
     // Evaluating for arrangedObjects
     if (_arrangedObjects) {
         notifyDelegateForFetchedObjects = NO;
-        
-        // Objects to insert and sort at the end
-        NSMutableArray *inserted = [NSMutableArray array];
 
-        [self evaluateDeletedObjects:deletedObjects inContainer:_arrangedObjects fetchRequest:self.arrangedObjectInMemoryFetchRequest notifyDelegate:YES];
-        [self evaluateUpdatedObjects:updatedObjects inContainer:_arrangedObjects fetchRequest:self.arrangedObjectInMemoryFetchRequest notifyDelegate:YES newlyInsertedObjects:inserted forceResort:NO];
-        [self evaluateUpdatedObjects:refreshedObjects inContainer:_arrangedObjects fetchRequest:self.arrangedObjectInMemoryFetchRequest notifyDelegate:YES newlyInsertedObjects:inserted forceResort:YES];
-        [self evaluateInsertedObjects:insertedObjects inContainer:_arrangedObjects fetchRequest:self.arrangedObjectInMemoryFetchRequest notifyDelegate:YES newlyInsertedObjects:inserted];
+        NSDictionary *results = [self evaluateDeletedObjects:deletedObjects
+                                             insertedObjects:insertedObjects
+                                              updatedObjects:updatedAndRefreshedObject
+                                                 inContainer:_arrangedObjects
+                                                fetchRequest:_arrangedObjectInMemoryFetchRequest];
+        
+        if (results) {
+            
+            NSMutableArray *newContainer = [results objectForKey:SFNewContainerKey];
+            NSMutableArray *oldContainer = [_arrangedObjects copy];
+
+            [self delegateWillChangeContent];
+            _arrangedObjects = newContainer;
+
+            [self notifyChangesForOldContainer:oldContainer
+                                  newContainer:newContainer
+                                deletedObjects:results[NSDeletedObjectsKey]
+                               insertedObjects:results[NSInsertedObjectsKey]
+                                updatedObjects:results[NSUpdatedObjectsKey]];
+
+            [self delegateDidChangeContent];
+        }
+
     }
     
-    // Objects to insert and sort at the end
-    NSMutableArray *inserted = [NSMutableArray array];
-
     // Evaluating for fetchedObjects
-    [self evaluateDeletedObjects:deletedObjects inContainer:_fetchedObjects fetchRequest:self.fetchRequest notifyDelegate:notifyDelegateForFetchedObjects];
-    [self evaluateUpdatedObjects:updatedObjects inContainer:_fetchedObjects fetchRequest:self.fetchRequest notifyDelegate:notifyDelegateForFetchedObjects newlyInsertedObjects:inserted forceResort:NO];
-    [self evaluateUpdatedObjects:refreshedObjects inContainer:_fetchedObjects fetchRequest:self.fetchRequest notifyDelegate:notifyDelegateForFetchedObjects newlyInsertedObjects:inserted forceResort:YES];
-    [self evaluateInsertedObjects:insertedObjects inContainer:_fetchedObjects fetchRequest:self.fetchRequest notifyDelegate:notifyDelegateForFetchedObjects newlyInsertedObjects:inserted];
+    NSDictionary *results = [self evaluateDeletedObjects:deletedObjects
+                                         insertedObjects:insertedObjects
+                                          updatedObjects:updatedAndRefreshedObject
+                                             inContainer:_fetchedObjects
+                                            fetchRequest:self.fetchRequest];
     
-    // if delegateWillChangeContent: was called then delegateDidChangeContent: must also be called
-    if (didCallDelegateWillChangeContent) {
-        [self delegateDidChangeContent];
-    }
-}
+    if (results) {
+        
+        NSMutableArray *newContainer = [results objectForKey:SFNewContainerKey];
+        NSMutableArray *oldContainer = [_fetchedObjects copy];
 
-- (void) evaluateDeletedObjects: (NSArray *) deletedObjects
-                    inContainer: (NSMutableArray *) container
-                   fetchRequest: (NSFetchRequest *) fetchRequest
-                 notifyDelegate: (BOOL) notifyDelegate
-{
-    NSEntityDescription *entity = [fetchRequest entity];
+        if (notifyDelegateForFetchedObjects) {
+            
+            [self delegateWillChangeContent];
+            _fetchedObjects = newContainer;
 
-    for (NSManagedObject *object in deletedObjects) {
-        
-        // Don't care about objects of a different entity
-        if (![[object entity] isKindOfEntity:entity]) { continue; }
-        
-        // Check to see if the content array contains the deleted object
-        NSUInteger index = [container indexOfObject:object];
-        if (index == NSNotFound) { continue; }
-        
-        // Delegate notification
-        if (notifyDelegate) { [self delegateWillChangeContent]; }
-        
-        // Removing object
-        [container removeObjectAtIndex:index];
-
-        // Delegate notification
-        if (notifyDelegate) {
-            [self delegateDidChangeObject:object atIndex:index forChangeType:MRTFetchedResultsChangeDelete newIndex:NSNotFound];
+            [self notifyChangesForOldContainer:oldContainer
+                                  newContainer:newContainer
+                                deletedObjects:results[NSDeletedObjectsKey]
+                               insertedObjects:results[NSInsertedObjectsKey]
+                                updatedObjects:results[NSUpdatedObjectsKey]];
+            
+            [self delegateDidChangeContent];
+        }
+        else {
+            _fetchedObjects = newContainer;
         }
         
     }
 }
 
-- (void) evaluateUpdatedObjects: (NSArray *) updatedObjects
-                    inContainer: (NSMutableArray *) container
-                   fetchRequest: (NSFetchRequest *) fetchRequest
-                 notifyDelegate: (BOOL) notifyDelegate
-           newlyInsertedObjects: (NSMutableArray *) newlyInsertedObjects
-                    forceResort: (BOOL) forceResort
-{
-    NSEntityDescription *entity = [fetchRequest entity];
-    NSPredicate *predicate = [fetchRequest predicate];
-    NSArray *sortDescriptors = [fetchRequest sortDescriptors];
-    NSArray *sortKeys = [sortDescriptors valueForKey:@"key"];
 
-    NSMutableArray *updated = [NSMutableArray array];
+
+
+- (NSDictionary *) evaluateDeletedObjects: (NSArray *) deletedObjects
+                            insertedObjects: (NSArray *) insertedObjects
+                             updatedObjects: (NSArray *) updatedObjects
+                                inContainer: (NSMutableArray *) container
+                               fetchRequest: (NSFetchRequest *) fetchRequest
+{
     
-    for (NSManagedObject *object in updatedObjects) {
-        // Ignore objects of a different entity
-        if (![[object entity] isKindOfEntity:entity]) { continue; }
-        
-        // Check to see if the predicate evaluates regardless of whether the object exists in the content array or not
-        // because changes to the attributes of the object can result in it either being removed or added to the
-        // content array depending on whether it affects the evaluation of the predicate
-        BOOL predicateEvaluates = (predicate != nil) ? [predicate evaluateWithObject:object] : YES;
-        NSUInteger objectIndex = [container indexOfObject:object];
-        BOOL containsObject = (objectIndex != NSNotFound);
-        
-        // If the content array already contains the object but the update resulted in the predicate
-        // no longer evaluating to TRUE, then it needs to be removed
-        if (containsObject && !predicateEvaluates) {
-
-            // Delegate notification
-            if (notifyDelegate) { [self delegateWillChangeContent]; }
-
-            [container removeObjectAtIndex:objectIndex];
-            
-            // Delegate notification
-            if(notifyDelegate) { [self delegateDidChangeObject:object atIndex:objectIndex forChangeType:MRTFetchedResultsChangeDelete newIndex:NSNotFound]; }
-
-        }
-        
-        // If the content array does not contain the object but the object's update resulted in the predicate now
-        // evaluating to TRUE, then it needs to be inserted
-        else if (!containsObject && predicateEvaluates) {
-            [newlyInsertedObjects addObject:object];
-        }
-        
-        else if (containsObject) {
-            // Check if the object's updated keys are in the sort keys
-            // This means that the sorting would have to be updated
-            BOOL sortingChanged = NO;
-            
-            // Refreshed objects doesn't seem to carry the "changedValuesForCurrentEvent" so the we are forced to resort
-            if ([sortKeys count] && !forceResort) {
-                NSMutableSet *keySet = [NSMutableSet set];
-                
-                [keySet addObjectsFromArray:[[object changedValuesForCurrentEvent] allKeys]];
-                //[keySet addObjectsFromArray:[[object changedValues] allKeys]];
-                
-                NSArray *keys = [keySet allObjects];
-                
-                for (NSString *key in sortKeys) {
-                    if ([keys containsObject:key]) {
-                        sortingChanged = YES;
-                        break;
-                    }
-                }
-            }
-            
-            if (sortingChanged || forceResort) {
-                // Create a wrapper object that keeps track of the original index for later
-                MRTFetchedResultsUpdate *update = [MRTFetchedResultsUpdate new];
-                update.originalIndex = objectIndex;
-                update.object = object;
-                [updated addObject:update];
-            } else {
-                // If there's no change in sorting then just update the object as-is
-                if (notifyDelegate) { [self delegateWillChangeContent]; }
-                if (notifyDelegate) { [self delegateDidChangeObject:object atIndex:objectIndex forChangeType:MRTFetchedResultsChangeUpdate newIndex:objectIndex]; }
-            }
-        }
-    }
-    // If there were updated objects that changed the sorting then resort and notify the delegate of changes
-    if ([updated count] && [sortDescriptors count]) {
-        if (notifyDelegate) { [self delegateWillChangeContent]; }
-        [container sortUsingDescriptors:sortDescriptors];
-        for (MRTFetchedResultsUpdate *update in updated) {
-            // Find out then new index of the object in the content array
-            NSUInteger newIndex = [container indexOfObject:update.object];
-            // If the new index is different from the old one
-            if (update.originalIndex != newIndex && notifyDelegate) {
-                [self delegateDidChangeObject:update.object atIndex:update.originalIndex forChangeType:MRTFetchedResultsChangeMove newIndex:newIndex];
-            }
-            // If there's no change in index then just update the object as-is
-            else if(notifyDelegate){
-                [self delegateDidChangeObject:update.object atIndex:newIndex forChangeType:MRTFetchedResultsChangeUpdate newIndex:newIndex];
-            }
-        }
-    }
-}
-
-
-
-- (void) evaluateInsertedObjects: (NSArray *) insertedObjects
-                     inContainer: (NSMutableArray *) container
-                    fetchRequest: (NSFetchRequest *) fetchRequest
-                  notifyDelegate: (BOOL) notifyDelegate
-            newlyInsertedObjects: (NSMutableArray *) newlyInsertedObjects
-{
-    NSEntityDescription *entity = [fetchRequest entity];
-    NSPredicate *predicate = [fetchRequest predicate];
-    NSArray *sortDescriptors = [fetchRequest sortDescriptors];
-
-    for (NSManagedObject *object in insertedObjects) {
-        // Objects of a different entity or objects that don't evaluate to the predicate are ignored (or if the object is already contained in the container)
-        if (![[object entity] isKindOfEntity:entity] || (predicate && ![predicate evaluateWithObject:object]) || [container containsObject:object]) {
+    NSMutableArray *containerDeletedObjects = [NSMutableArray array];
+    NSMutableArray *containerInsertedObjects = [NSMutableArray array];
+    NSMutableArray *containerUpdatedObjects = [NSMutableArray array];
+    
+    NSMutableArray *newContainer = [container mutableCopy];
+    
+    // DELETED objects
+    for (NSManagedObject *deletedObj in deletedObjects) {
+        if (![self object:deletedObj isConformToFetchRequest:fetchRequest]) {
             continue;
         }
-        [newlyInsertedObjects addObject:object];
+        
+        [newContainer removeObject:deletedObj];
+        [containerDeletedObjects addObject:deletedObj];
     }
-    // If there were inserted objects then insert them into the content array and resort
-    NSUInteger insertedCount = [newlyInsertedObjects count];
-    if (insertedCount) {
+    
+    // INSERTED objects
+    for (NSManagedObject *insertedObj in insertedObjects) {
+        if (![self object:insertedObj isConformToFetchRequest:fetchRequest]) {
+            continue;
+        }
         
-        // Delegate notification
-        if (notifyDelegate) { [self delegateWillChangeContent]; }
-        
-        // Dump the inserted objects into the content array
-        [container addObjectsFromArray:newlyInsertedObjects];
-        
-        // If there are sort descriptors, then resort the array
-        if ([sortDescriptors count]) {
-            [container sortUsingDescriptors:sortDescriptors];
+        [newContainer addObject:insertedObj];
+        [containerInsertedObjects addObject:insertedObj];
+    }
 
-            if (notifyDelegate) {
-                // Enumerate through each of the inserted objects and notify the delegate of their new position
-                [container enumerateObjectsUsingBlock:^(NSManagedObject *object, NSUInteger idx, BOOL *stop) {
-                    if (![newlyInsertedObjects containsObject:object]) {
-                        return;
-                    }
-                    
-                    [self delegateDidChangeObject:object atIndex:NSNotFound forChangeType:MRTFetchedResultsChangeInsert newIndex:idx];
-                }];
-            }
+    // UPDATED objects (after the update they can be inserted/deleted/updated/moved in the container)
+    for (NSManagedObject *updatedObj in updatedObjects) {
+
+        // Object is inside the container, but no longer conform to the fetch request (deleted)
+        if (![self object:updatedObj isConformToFetchRequest:fetchRequest]) {
+
+            if ([container containsObject:updatedObj]) {
+                [newContainer removeObject:updatedObj];
+                [containerDeletedObjects addObject:updatedObj];
+                
+            }            
         }
-        
-        // If there are no sort descriptors, then the inserted objects will just be added to the end of the array
-        // so we don't need to figure out what indexes they were inserted in
-        else  if(notifyDelegate){
-            NSUInteger objectsCount = [container count];
-            for (NSInteger i = (objectsCount - insertedCount); i < objectsCount; i++) {
-                [self delegateDidChangeObject:[container objectAtIndex:i] atIndex:NSNotFound forChangeType:MRTFetchedResultsChangeInsert newIndex:i];
+
+        // Object conform to the fetch request
+        else {
+            // Already inside the container (updated)
+            if ([container containsObject:updatedObj]) {
+                [containerUpdatedObjects addObject:updatedObj];
+            }
+            // Not inside the container (inserted)
+            else {
+                [newContainer addObject:updatedObj];
+                [containerInsertedObjects addObject:updatedObj];
             }
         }
     }
-   
+    
+    // Resorting the newContainer if needed
+    NSArray *sortDescriptors = [fetchRequest sortDescriptors];
+    if ([sortDescriptors count]) {
+        [newContainer sortUsingDescriptors:sortDescriptors];
+        
+        // This make me cry, but MacOSX is a bitch (it have sequential and progressive table update, iOS instead have batched updates)
+        
+        // Insert should be sorted and sequential
+        [containerInsertedObjects sortUsingDescriptors:sortDescriptors];
+
+        // Delete should be reverse sorted
+        [containerDeletedObjects sortUsingDescriptors:sortDescriptors];
+        containerDeletedObjects = [[[containerDeletedObjects reverseObjectEnumerator] allObjects] mutableCopy];
+        
+    }
+    
+    if ((containerDeletedObjects.count || containerUpdatedObjects.count || containerInsertedObjects.count)) {
+        return @{
+                 NSInsertedObjectsKey:containerInsertedObjects,
+                 NSDeletedObjectsKey:containerDeletedObjects,
+                 NSUpdatedObjectsKey:containerUpdatedObjects,
+                 SFNewContainerKey: newContainer,
+                 };
+    }
+ 
+    return nil;
 }
+
+- (BOOL) object: (NSManagedObject *) object isConformToFetchRequest: (NSFetchRequest *) fetchRequest
+{
+    // Evaluating entity
+    NSEntityDescription *entity = [fetchRequest entity];
+    if (![[object entity] isKindOfEntity:entity]) {
+        return NO;
+    }
+    
+    // Evalutating eventual predicate
+    NSPredicate *predicate = [fetchRequest predicate];
+    if (predicate != nil && ![predicate evaluateWithObject:object]) {
+        return NO;
+    }
+    
+    return YES;
+}
+
 
 #pragma mark - Notifications
 
 - (void)delegateWillChangeContent
 {
-    if (delegateHas.delegateHasWillChangeContent && !didCallDelegateWillChangeContent) {
+    if (delegateHas.delegateHasWillChangeContent) {
         [self.delegate controllerWillChangeContent:self];
-        didCallDelegateWillChangeContent = YES;
     }
 }
 
@@ -410,11 +363,39 @@
     }
 }
 
-@end
+- (void) notifyChangesForOldContainer: (NSArray *) oldContainer
+                         newContainer: (NSArray *) newContainer
+                       deletedObjects: (NSArray *) deletedObjects
+                      insertedObjects: (NSArray *) insertedObjects
+                       updatedObjects: (NSArray *) updatedObjects
+{
+    // DELETED
+    for (id obj in deletedObjects) {
+        NSUInteger index = [oldContainer indexOfObject:obj];
+        [self delegateDidChangeObject:obj atIndex:index forChangeType:MRTFetchedResultsChangeDelete newIndex:NSNotFound];
+    }
+    
+    // INSERTED
+    for (id obj in insertedObjects) {
+        NSUInteger newIndex = [newContainer indexOfObject:obj];
+        [self delegateDidChangeObject:obj atIndex:NSNotFound forChangeType:MRTFetchedResultsChangeInsert newIndex:newIndex];
+    }
+    
+    // UPDATED AND MOVED
+    for (id obj in updatedObjects) {
+        NSUInteger index = [oldContainer indexOfObject:obj];
+        NSUInteger newIndex = [newContainer indexOfObject:obj];
+        
+        // Same index, the object was just updated
+        if (index == newIndex) {
+            [self delegateDidChangeObject:obj atIndex:index forChangeType:MRTFetchedResultsChangeUpdate newIndex:index];
+        }
+        
+        // Different index, mean that the object was also moved
+        else {
+            [self delegateDidChangeObject:obj atIndex:index forChangeType:MRTFetchedResultsChangeMove newIndex:newIndex];
+        }
+    }
+}
 
-#pragma mark - MRTFetchedResultsUpdate
-
-@implementation MRTFetchedResultsUpdate
-@synthesize object = sObject;
-@synthesize originalIndex = sOriginalIndex;
 @end

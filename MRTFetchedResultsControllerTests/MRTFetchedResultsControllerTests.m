@@ -717,77 +717,79 @@
 
 - (void) testMultipleTypeOfChanges
 {
-    /*
-     Initial status:
-     "empty"
-     
-     Status after first group of changes:
-     newObject (order 1) -> insert
-     newObject2 (order 2) -> insert
-     
-     Status aftersSecond group of changes:
-     newObject2 (order 0) -> move
-     newObject (order 1, "updated text") -> update
-     newObject3 (order 3) -> insert/deleted (won't fire any change)
-     newObject4 (order 4) -> insert
-     
-     Final Status:
-     newObject2 (order 0)
-     newObject (order 1, "updated text")
-     newObject4 (order 4)
-     */
+//     Initial status:
+//     "empty"
+//     
+//     Status after first group of changes:
+//     newObject (order 1) -> insert
+//     newObject2 (order 2) -> insert
+//     
+//     Status aftersSecond group of changes:
+//     newObject2 (order 0) -> move
+//     newObject (order 1, "updated text") -> update
+//     newObject3 (order 3) -> insert/deleted (won't fire any change)
+//     newObject4 (order 4) -> insert
+//     
+//     Final Status:
+//     newObject2 (order 0)
+//     newObject (order 1, "updated text")
+//     newObject4 (order 4)
     
+    
+    // Inserting a new object inside the managedObjectContext
+    Note *newObject0 = [NSEntityDescription insertNewObjectForEntityForName:@"Note" inManagedObjectContext:self.managedObjectContext];
+    newObject0.order = @0;
+    newObject0.text = @"0";
+    
+    // Inserting a new object inside the managedObjectContext
+    Note *newObject1 = [NSEntityDescription insertNewObjectForEntityForName:@"Note" inManagedObjectContext:self.managedObjectContext];
+    newObject1.order = @3;
+    newObject1.text = @"1";
+    
+    // Inserting a new object inside the managedObjectContext
+    Note *newObject2 = [NSEntityDescription insertNewObjectForEntityForName:@"Note" inManagedObjectContext:self.managedObjectContext];
+    newObject2.order = @4;
+    newObject2.text = @"2";
+    
+    // Inserting a new object inside the managedObjectContext
+    Note *newObject3 = [NSEntityDescription insertNewObjectForEntityForName:@"Note" inManagedObjectContext:self.managedObjectContext];
+    newObject3.order = @5;
+    newObject3.text = @"3";
+    
+    // Inserting a new object inside the managedObjectContext
+    Note *newObject4 = [NSEntityDescription insertNewObjectForEntityForName:@"Note" inManagedObjectContext:self.managedObjectContext];
+    newObject4.order = @6;
+    newObject4.text = @"4";
+
+    // Processing changes so the object is no longer listed in the "inserted objects"
+    [self.managedObjectContext processPendingChanges];
+
     // Creating the fetchedResultsController
     MRTFetchedResultsController *fetchedResultsController = [self notesFetchedResultsController];
     [fetchedResultsController performFetch:nil];
     
-    // Inserting a new object inside the managedObjectContext
-    Note *newObject = [NSEntityDescription insertNewObjectForEntityForName:@"Note" inManagedObjectContext:self.managedObjectContext];
-    newObject.order = @1;
-    
-    // Inserting a new object inside the managedObjectContext
-    Note *newObject2 = [NSEntityDescription insertNewObjectForEntityForName:@"Note" inManagedObjectContext:self.managedObjectContext];
-    newObject2.order = @2;
-    
-    // Processing changes so the object is no longer listed in the "inserted objects"
-    [self.managedObjectContext processPendingChanges];
-    
-    // Waiting for the delegate notifications
-    CFRunLoopRunInMode( kCFRunLoopDefaultMode, self.expectationsDefaultTimeout, NO );
-    
-    // Inserting a new object inside the managedObjectContext
-    Note *newObject3 = [NSEntityDescription insertNewObjectForEntityForName:@"Note" inManagedObjectContext:self.managedObjectContext];
-    newObject3.order = @3;
-    
-    // Inserting a new object inside the managedObjectContext
-    Note *newObject4 = [NSEntityDescription insertNewObjectForEntityForName:@"Note" inManagedObjectContext:self.managedObjectContext];
-    newObject4.order = @4;
-    
-    // Updating
-    newObject.text = @"updated text";
-    
-    // Moving
-    newObject2.order = @0;
-    
-    // Deleting
-    [self.managedObjectContext deleteObject:newObject3];
+    newObject0.text = @"update";
+    [self.managedObjectContext deleteObject:newObject2];
+    newObject3.order =  @2;
+    Note *newObject5 = [NSEntityDescription insertNewObjectForEntityForName:@"Note" inManagedObjectContext:self.managedObjectContext];
+    newObject5.order = @1;
+    newObject5.text = @"5";
     
     // Waiting for the delegate notifications
     CFRunLoopRunInMode( kCFRunLoopDefaultMode, self.expectationsDefaultTimeout, NO );
     
     // Checking number and type of events
-    [self checkExpectedNumberOfInserts:3 deletes:0 updates:1 moves:1];
-    
-    // Checking number of delegate calls
-    [self checkNumberOfWillDidChangeCalls:2];
+    [self checkExpectedNumberOfInserts:1 deletes:1 updates:1 moves:1];
     
     // Checking total number of object in the controller
-    XCTAssertEqual([fetchedResultsController count], 3, @"Number of object in the fetchedResultsController doesn't match");
+    XCTAssertEqual([fetchedResultsController count], 5, @"Number of object in the fetchedResultsController doesn't match");
     
     // Checking correct ordering
-    XCTAssertEqual([fetchedResultsController indexOfObject:newObject2], 0, @"Wrong order of object after insertion");
-    XCTAssertEqual([fetchedResultsController indexOfObject:newObject],  1, @"Wrong order of object after insertion");
-    XCTAssertEqual([fetchedResultsController indexOfObject:newObject4], 2, @"Wrong order of object after insertion");
+    XCTAssertEqual([fetchedResultsController indexOfObject:newObject1], 3, @"Wrong order of object after insertion");
+    XCTAssertEqual([fetchedResultsController indexOfObject:newObject0],  0, @"Wrong order of object after insertion");
+    XCTAssertEqual([fetchedResultsController indexOfObject:newObject4], 4, @"Wrong order of object after insertion");
+    
+    NSLog(@"%@", [fetchedResultsController arrangedObjects]);
 }
 
 #pragma mark - Arranged Objects
@@ -885,6 +887,9 @@
     Note *newObject3 = [NSEntityDescription insertNewObjectForEntityForName:@"Note" inManagedObjectContext:self.managedObjectContext];
     newObject3.order = @3;
     
+    // Processing changes so the object is no longer listed in the "inserted objects"
+    [self.managedObjectContext processPendingChanges];
+
     // Creating the fetchedResultsController
     MRTFetchedResultsController *fetchedResultsController = [self notesFetchedResultsController];
     [fetchedResultsController performFetch:nil];
@@ -1015,6 +1020,8 @@
 - (void)controller:(MRTFetchedResultsController *)controller didChangeObject:(id)anObject atIndex:(NSUInteger)index forChangeType:(MRTFetchedResultsChangeType)type newIndex:(NSUInteger)newIndex
 {
     //NSLog(@"did change object %@ type %lu", anObject, type);
+    NSLog(@"did change index %lu new index %lu", (unsigned long)index, (unsigned long)newIndex);
+
     switch (type) {
         case MRTFetchedResultsChangeDelete:
             self.numberOfDeletes++;

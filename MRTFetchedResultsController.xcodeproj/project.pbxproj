@@ -120,7 +120,7 @@
 		0C351CE41B0494B8002AE121 /* Project object */ = {
 			isa = PBXProject;
 			attributes = {
-				LastUpgradeCheck = 0630;
+				LastUpgradeCheck = 0640;
 				TargetAttributes = {
 					0C351CF01B049829002AE121 = {
 						CreatedOnToolsVersion = 6.3.1;
@@ -173,6 +173,7 @@
 		0C351CE81B0494B8002AE121 /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
+				ONLY_ACTIVE_ARCH = YES;
 			};
 			name = Debug;
 		};
@@ -294,6 +295,7 @@
 				0C351CFA1B049829002AE121 /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
 		};
 /* End XCConfigurationList section */
 
