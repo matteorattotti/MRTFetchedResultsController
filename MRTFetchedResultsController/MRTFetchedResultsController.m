@@ -303,10 +303,13 @@ const NSString *SFNewContainerKey = @"SFNewContainerKey";
         // Insert should be sorted and sequential
         [containerInsertedObjects sortUsingDescriptors:sortDescriptors];
 
-        // Delete should be reverse sorted
-        [containerDeletedObjects sortUsingDescriptors:sortDescriptors];
-        containerDeletedObjects = [[[containerDeletedObjects reverseObjectEnumerator] allObjects] mutableCopy];
-        
+        // Delete should be reverse sorted (using as reference the original object position)
+        [containerDeletedObjects sortUsingComparator:^NSComparisonResult(id obj1, id obj2) {
+            NSInteger index1 = [container indexOfObject:obj1];
+            NSInteger index2 = [container indexOfObject:obj2];
+
+            return index1 < index2;
+        }];
     }
     
     if ((containerDeletedObjects.count || containerUpdatedObjects.count || containerInsertedObjects.count)) {
