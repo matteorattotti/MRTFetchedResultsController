@@ -248,10 +248,10 @@ const NSString *SFNewContainerKey = @"SFNewContainerKey";
     
     // DELETED objects
     for (NSManagedObject *deletedObj in deletedObjects) {
-        if (![self object:deletedObj isConformToFetchRequest:fetchRequest]) {
+        if (![container containsObject:deletedObj]) {
             continue;
         }
-        
+
         [newContainer removeObject:deletedObj];
         [containerDeletedObjects addObject:deletedObj];
     }

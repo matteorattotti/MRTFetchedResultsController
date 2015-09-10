@@ -462,6 +462,40 @@
 }
 
 
+- (void) testDeletionWithPredicateChangingFromMatchedToUnmatchedObject
+{
+    // Inserting a matching object
+    Note *newObject = [NSEntityDescription insertNewObjectForEntityForName:@"Note" inManagedObjectContext:self.managedObjectContext];
+    newObject.trashed = @NO;
+    
+    [self.managedObjectContext processPendingChanges];
+    
+    // Creating the fetchedResultsController
+    MRTFetchedResultsController *fetchedResultsController = [self untrashedNotesFetchedResultsController];
+    [fetchedResultsController performFetch:nil];
+    
+    XCTAssertEqual([fetchedResultsController count], 1, @"Number of object in the fetchedResultsController doesn't match");
+
+    newObject.trashed = @YES;
+    [self.managedObjectContext deleteObject:newObject];
+    
+    CFRunLoopRunInMode( kCFRunLoopDefaultMode, self.expectationsDefaultTimeout, NO );
+
+    // Checking total number of object in the controller
+    XCTAssertEqual([fetchedResultsController count], 0, @"Number of object in the fetchedResultsController doesn't match");
+    
+    CFRunLoopRunInMode( kCFRunLoopDefaultMode, self.expectationsDefaultTimeout, NO );
+    
+    // Checking number and type of events
+    [self checkExpectedNumberOfInserts:0 deletes:1 updates:0 moves:0];
+    
+    // Checking number of delegate calls
+    [self checkNumberOfWillDidChangeCalls:1];
+    
+    // Checking total number of object in the controller
+    XCTAssertEqual([fetchedResultsController count], 0, @"Number of object in the fetchedResultsController doesn't match");
+}
+
 
 #pragma mark - Move
 
