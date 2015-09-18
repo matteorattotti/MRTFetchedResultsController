@@ -994,6 +994,107 @@
     XCTAssertEqual([fetchedResultsController indexOfObject:newObject3],  2, @"Wrong order of object after removing filter predicate");
 }
 
+#pragma mark - Arranged Objects Update/Deletion
+
+// Deleting an object that match the arrangedObject predicate
+- (void) testArrangedObjectDeletion
+{
+    // Inserting a new object inside the managedObjectContext
+    Note *newObject = [NSEntityDescription insertNewObjectForEntityForName:@"Note" inManagedObjectContext:self.managedObjectContext];
+    newObject.order = @1;
+    
+    // Inserting a new object inside the managedObjectContext
+    Note *newObject2 = [NSEntityDescription insertNewObjectForEntityForName:@"Note" inManagedObjectContext:self.managedObjectContext];
+    newObject2.order = @2;
+    
+    // Inserting a new object inside the managedObjectContext
+    Note *newObject3 = [NSEntityDescription insertNewObjectForEntityForName:@"Note" inManagedObjectContext:self.managedObjectContext];
+    newObject3.order = @3;
+    
+    // Processing changes so the object is no longer listed in the "inserted objects"
+    [self.managedObjectContext processPendingChanges];
+
+    // Creating the fetchedResultsController
+    MRTFetchedResultsController *fetchedResultsController = [self notesFetchedResultsController];
+    [fetchedResultsController performFetch:nil];
+    
+    // Creating and applying a predicate
+    NSPredicate *predicate = [NSPredicate predicateWithFormat:@"order >= %@", @2];
+    [fetchedResultsController setFilterPredicate:predicate];
+    
+    // Deleting the object
+    [self.managedObjectContext deleteObject:newObject2];
+    
+    // Creating a new expectation
+    XCTestExpectation *expectation = [self expectationWithDescription:@"Delete of object notified"];
+    newObject2.deleteExpectation = expectation;
+    
+    // Waiting for all expectations
+    [self waitForExpectationsWithTimeout:self.expectationsDefaultTimeout handler:^(NSError *error) {
+        if(error) XCTFail(@"Expectation Failed with error: %@", error);
+        
+        // Checking number and type of events
+        [self checkExpectedNumberOfInserts:0 deletes:1 updates:0 moves:0];
+        
+        // Checking number of delegate calls
+        [self checkNumberOfWillDidChangeCalls:1];
+        
+        // Checking total number of object in the controller
+        XCTAssertEqual([fetchedResultsController count], 1, @"Number of object in the fetchedResultsController doesn't match");
+    }];
+}
+
+// Applying a filter predicate then updating an object so that it doesn't match anymore the original predicate, expecting a delete
+- (void) testArrangedObjectUpdateWithPredicateUnmatchedObject
+{
+    // Inserting a new object inside the managedObjectContext
+    Note *newObject = [NSEntityDescription insertNewObjectForEntityForName:@"Note" inManagedObjectContext:self.managedObjectContext];
+    newObject.order = @1;
+    newObject.trashed = @NO;
+    
+    // Inserting a new object inside the managedObjectContext
+    Note *newObject2 = [NSEntityDescription insertNewObjectForEntityForName:@"Note" inManagedObjectContext:self.managedObjectContext];
+    newObject2.order = @2;
+    newObject2.trashed = @NO;
+
+    // Inserting a new object inside the managedObjectContext
+    Note *newObject3 = [NSEntityDescription insertNewObjectForEntityForName:@"Note" inManagedObjectContext:self.managedObjectContext];
+    newObject3.order = @3;
+    newObject3.trashed = @NO;
+
+    // Processing changes so the object is no longer listed in the "inserted objects"
+    [self.managedObjectContext processPendingChanges];
+    
+    // Creating the fetchedResultsController
+    MRTFetchedResultsController *fetchedResultsController = [self untrashedNotesFetchedResultsController];
+    [fetchedResultsController performFetch:nil];
+    
+    // Creating and applying a predicate
+    NSPredicate *predicate = [NSPredicate predicateWithFormat:@"order >= %@", @2];
+    [fetchedResultsController setFilterPredicate:predicate];
+    
+    // Updating the object so it doesn't match the trashed==NO
+    newObject2.trashed = @YES;
+    
+    // Creating a new expectation
+    XCTestExpectation *expectation = [self expectationWithDescription:@"Delete of object notified"];
+    newObject2.deleteExpectation = expectation;
+    
+    // Waiting for all expectations
+    [self waitForExpectationsWithTimeout:self.expectationsDefaultTimeout handler:^(NSError *error) {
+        if(error) XCTFail(@"Expectation Failed with error: %@", error);
+        
+        // Checking number and type of events
+        [self checkExpectedNumberOfInserts:0 deletes:1 updates:0 moves:0];
+        
+        // Checking number of delegate calls
+        [self checkNumberOfWillDidChangeCalls:1];
+        
+        // Checking total number of object in the controller
+        XCTAssertEqual([fetchedResultsController count], 1, @"Number of object in the fetchedResultsController doesn't match");
+    }];
+}
+
 #pragma mark - MRTFetchedResultsController utils
 
 - (MRTFetchedResultsController *) notesFetchedResultsController
