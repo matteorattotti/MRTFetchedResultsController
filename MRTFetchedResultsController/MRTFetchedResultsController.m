@@ -145,9 +145,19 @@ const NSString *SFNewContainerKey = @"SFNewContainerKey";
         // creating the in memory fetch request
         _arrangedObjectInMemoryFetchRequest = [[NSFetchRequest alloc] init];
         _arrangedObjectInMemoryFetchRequest.entity = _fetchRequest.entity;
-        _arrangedObjectInMemoryFetchRequest.sortDescriptors = _sortDescriptors;
-        
-        // Creating the predicate, need the fetch request one + the filter one
+
+        // Adding the sort descriptor (the custom one, or the original one, or nothing)
+        if (_sortDescriptors) {
+            _arrangedObjectInMemoryFetchRequest.sortDescriptors = _sortDescriptors;
+        }
+        else if(_fetchRequest.sortDescriptors) {
+            _arrangedObjectInMemoryFetchRequest.sortDescriptors = _fetchRequest.sortDescriptors;
+        }
+        else {
+            _arrangedObjectInMemoryFetchRequest.sortDescriptors = nil;
+        }
+
+        // Adding the predicate, need the fetch request one + the filter one
         NSMutableArray *predicates = [NSMutableArray array];
         if (_filterPredicate) { [predicates addObject:_filterPredicate]; }
         if (_fetchRequest.predicate) { [predicates addObject:_fetchRequest.predicate]; }
@@ -159,8 +169,6 @@ const NSString *SFNewContainerKey = @"SFNewContainerKey";
         else {
             _arrangedObjectInMemoryFetchRequest.predicate = nil;
         }
-        
-        
     }
 }
 
