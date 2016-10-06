@@ -19,6 +19,7 @@ const NSString *SFNewContainerKey = @"SFNewContainerKey";
         BOOL delegateHasWillChangeContent;
         BOOL delegateHasDidChangeContent;
         BOOL delegateHasDidChangeObject;
+        BOOL delegateHasDidChangeObjectWithProgressiveChanges;
     } delegateHas;
 }
 
@@ -96,6 +97,7 @@ const NSString *SFNewContainerKey = @"SFNewContainerKey";
     delegateHas.delegateHasWillChangeContent = [_delegate respondsToSelector:@selector(controllerWillChangeContent:)];
     delegateHas.delegateHasDidChangeContent  = [_delegate respondsToSelector:@selector(controllerDidChangeContent:)];
     delegateHas.delegateHasDidChangeObject   = [_delegate respondsToSelector:@selector(controller:didChangeObject:atIndex:forChangeType:newIndex:)];
+    delegateHas.delegateHasDidChangeObjectWithProgressiveChanges = [_delegate respondsToSelector:@selector(controller:didChangeObject:atIndex:progressiveChangeIndex:forChangeType:newIndex:)];
 }
 
 - (void)setSortDescriptors:(NSArray *)sortDescriptors
@@ -320,18 +322,8 @@ const NSString *SFNewContainerKey = @"SFNewContainerKey";
     if ([sortDescriptors count]) {
         [newContainer sortUsingDescriptors:sortDescriptors];
         
-        // This make me cry, but MacOSX is a bitch (it have sequential and progressive table update, iOS instead have batched updates)
-        
-        // Insert should be sorted and sequential
         [containerInsertedObjects sortUsingDescriptors:sortDescriptors];
-
-        // Delete should be reverse sorted (using as reference the original object position)
-        [containerDeletedObjects sortUsingComparator:^NSComparisonResult(id obj1, id obj2) {
-            NSInteger index1 = [container indexOfObject:obj1];
-            NSInteger index2 = [container indexOfObject:obj2];
-
-            return index1 < index2;
-        }];
+        [containerDeletedObjects sortUsingDescriptors:sortDescriptors];
     }
     
     if ((containerDeletedObjects.count || containerUpdatedObjects.count || containerInsertedObjects.count)) {
@@ -380,10 +372,14 @@ const NSString *SFNewContainerKey = @"SFNewContainerKey";
     }
 }
 
-- (void)delegateDidChangeObject:(id)anObject atIndex:(NSUInteger)index forChangeType:(MRTFetchedResultsChangeType)type newIndex:(NSUInteger)newIndex
+- (void)delegateDidChangeObject:(id)anObject atIndex:(NSUInteger)index progressiveChangeIndex:(NSUInteger) progressiveChangeIndex forChangeType:(MRTFetchedResultsChangeType)type newIndex:(NSUInteger)newIndex
 {
     // NSLog(@"Changing object: %@\nAt index: %lu\nChange type: %d\nNew index: %lu", anObject, index, (int)type, newIndex);
-    if (delegateHas.delegateHasDidChangeObject) {
+    
+    if (delegateHas.delegateHasDidChangeObjectWithProgressiveChanges) {
+        [self.delegate controller:self didChangeObject:anObject atIndex:index progressiveChangeIndex:progressiveChangeIndex forChangeType:type newIndex:newIndex];
+    }
+    else if (delegateHas.delegateHasDidChangeObject) {
         [self.delegate controller:self didChangeObject:anObject atIndex:index forChangeType:type newIndex:newIndex];
     }
 }
@@ -394,33 +390,57 @@ const NSString *SFNewContainerKey = @"SFNewContainerKey";
                       insertedObjects: (NSArray *) insertedObjects
                        updatedObjects: (NSArray *) updatedObjects
 {
+    
+    NSMutableIndexSet *insertedIndexes = [NSMutableIndexSet indexSet];
+    NSMutableIndexSet *deletedIndexes = [NSMutableIndexSet indexSet];
+    
     // DELETED
     for (id obj in deletedObjects) {
         NSUInteger index = [oldContainer indexOfObject:obj];
-        [self delegateDidChangeObject:obj atIndex:index forChangeType:MRTFetchedResultsChangeDelete newIndex:NSNotFound];
+        NSUInteger progressiveIndex = [self progressiveChangeIndexForIndex:index withInsertedIndexes:insertedIndexes deletedIndexes:deletedIndexes];
+        [deletedIndexes addIndex:index];
+        
+        [self delegateDidChangeObject:obj atIndex:index progressiveChangeIndex:progressiveIndex forChangeType:MRTFetchedResultsChangeDelete newIndex:NSNotFound];
     }
     
     // INSERTED
     for (id obj in insertedObjects) {
         NSUInteger newIndex = [newContainer indexOfObject:obj];
-        [self delegateDidChangeObject:obj atIndex:NSNotFound forChangeType:MRTFetchedResultsChangeInsert newIndex:newIndex];
+        [insertedIndexes addIndex:newIndex];
+
+        [self delegateDidChangeObject:obj atIndex:NSNotFound progressiveChangeIndex:NSNotFound forChangeType:MRTFetchedResultsChangeInsert newIndex:newIndex];
     }
     
-    // UPDATED AND MOVED
+    // UPDATED OR MOVED
     for (id obj in updatedObjects) {
         NSUInteger index = [oldContainer indexOfObject:obj];
         NSUInteger newIndex = [newContainer indexOfObject:obj];
+        NSUInteger progressiveIndex = [self progressiveChangeIndexForIndex:index withInsertedIndexes:insertedIndexes deletedIndexes:deletedIndexes];
         
+        [deletedIndexes addIndex:index];
+        [insertedIndexes addIndex:newIndex];
+
         // Same index, the object was just updated
         if (index == newIndex) {
-            [self delegateDidChangeObject:obj atIndex:index forChangeType:MRTFetchedResultsChangeUpdate newIndex:index];
+            [self delegateDidChangeObject:obj atIndex:index progressiveChangeIndex:progressiveIndex forChangeType:MRTFetchedResultsChangeUpdate newIndex:index];
         }
         
         // Different index, mean that the object was also moved
         else {
-            [self delegateDidChangeObject:obj atIndex:index forChangeType:MRTFetchedResultsChangeMove newIndex:newIndex];
+            [self delegateDidChangeObject:obj atIndex:index progressiveChangeIndex:progressiveIndex forChangeType:MRTFetchedResultsChangeMove newIndex:newIndex];
         }
     }
+}
+
+- (NSUInteger) progressiveChangeIndexForIndex: (NSUInteger) index withInsertedIndexes: (NSIndexSet *) insertedIndexes deletedIndexes: (NSIndexSet *) deletedIndexes
+{
+    NSUInteger previousInsertedIndexes = [insertedIndexes countOfIndexesInRange:NSMakeRange(0, index+1)];
+    NSUInteger previousDeletedIndexes = [deletedIndexes countOfIndexesInRange:NSMakeRange(0, index+1)];
+    
+    index+=previousInsertedIndexes;
+    index-=previousDeletedIndexes;
+    
+    return index;
 }
 
 @end

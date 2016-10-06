@@ -84,4 +84,17 @@ typedef NSUInteger MRTFetchedResultsChangeType;
  @param newIndex The new index of the object. If the object was deleted, the newIndex will be NSNotFound.
  */
 - (void)controller:(MRTFetchedResultsController *)controller didChangeObject:(id)anObject atIndex:(NSUInteger)index forChangeType:(MRTFetchedResultsChangeType)type newIndex:(NSUInteger)newIndex;
+
+/**
+ Called for each change that is made to the content array. This method will be called multiple times throughout the change processing.
+ If the delegate implement this methods this will called instead of controller:didChangeObject:atIndex:forChangeType:newIndex:
+ @param controller The fetched results controller
+ @param anObject The object that was updated, deleted, inserted, or moved
+ @param index The original index of the object. If the object was inserted and did not exist previously, this will be NSNotFound
+ @param progressiveChangeIndex the index corrected keeping in consideration the previous changes in the same batch (Usefull for keeping another array in sync, or for macOS NSTableView as it does't batch changes like on iOS
+ @param type The type of change (update, insert, delete, or move)
+ @param newIndex The new index of the object. If the object was deleted, the newIndex will be NSNotFound.
+ */
+- (void)controller:(MRTFetchedResultsController *)controller didChangeObject:(id)anObject atIndex:(NSUInteger)index progressiveChangeIndex:(NSUInteger) progressiveChangeIndex forChangeType:(MRTFetchedResultsChangeType)type newIndex:(NSUInteger)newIndex;
+
 @end

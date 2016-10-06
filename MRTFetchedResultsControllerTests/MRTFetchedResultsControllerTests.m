@@ -579,6 +579,51 @@
     }];
 }
 
+- (void) testMoveInsert
+{
+    
+    // Inserting a new object inside the managedObjectContext
+    Note *newObject = [NSEntityDescription insertNewObjectForEntityForName:@"Note" inManagedObjectContext:self.managedObjectContext];
+    newObject.order = @1;
+    
+    Note *newObject2 = [NSEntityDescription insertNewObjectForEntityForName:@"Note" inManagedObjectContext:self.managedObjectContext];
+    newObject2.order = @2;
+    
+    // Processing changes so the object is no longer listed in the "inserted objects"
+    [self.managedObjectContext processPendingChanges];
+    
+    // Creating the fetchedResultsController
+    MRTFetchedResultsController *fetchedResultsController = [self notesFetchedResultsController];
+    [fetchedResultsController performFetch:nil];
+    
+    // Insert a new object between the two
+    Note *newObject3 = [NSEntityDescription insertNewObjectForEntityForName:@"Note" inManagedObjectContext:self.managedObjectContext];
+    newObject3.order = @0;
+
+    // At the same time changing the text of the first note
+    newObject.text = @"changed";
+    
+    // Creating a new expectation
+    XCTestExpectation *expectation = [self expectationWithDescription:@"Inser of object notified"];
+    newObject3.insertExpectation = expectation;
+    
+    // Waiting for all expectations
+    [self waitForExpectationsWithTimeout:self.expectationsDefaultTimeout handler:^(NSError *error) {
+        if(error) XCTFail(@"Expectation Failed with error: %@", error);
+        
+        // Checking number and type of events
+        [self checkExpectedNumberOfInserts:1 deletes:0 updates:0 moves:1];
+        
+        // Checking number of delegate calls
+        [self checkNumberOfWillDidChangeCalls:1];
+
+        XCTAssertTrue([[fetchedResultsController arrangedObjects] indexOfObject:newObject] == 1);
+        XCTAssertTrue([[fetchedResultsController arrangedObjects] indexOfObject:newObject3] == 0);
+        XCTAssertTrue([[fetchedResultsController arrangedObjects] indexOfObject:newObject2] == 2);
+        
+    }];
+}
+
 
 - (void) testMoveWithPredicateMatchedObject
 {
