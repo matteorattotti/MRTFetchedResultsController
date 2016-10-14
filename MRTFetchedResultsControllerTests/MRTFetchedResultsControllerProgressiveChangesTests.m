@@ -191,7 +191,7 @@
 
 #pragma mark - Multiple changes
 
-- (void) testMoveInsert
+- (void) testInsertDelete
 {
     
     // Inserting a new object inside the managedObjectContext
@@ -199,7 +199,7 @@
     newObject.order = @1;
     
     Note *newObject2 = [NSEntityDescription insertNewObjectForEntityForName:@"Note" inManagedObjectContext:self.managedObjectContext];
-    newObject2.order = @2;
+    newObject2.order = @3;
     
     [self.targetArray addObjectsFromArray:@[newObject, newObject2]];
     
@@ -212,10 +212,44 @@
     
     // Insert a new object between the two
     Note *newObject3 = [NSEntityDescription insertNewObjectForEntityForName:@"Note" inManagedObjectContext:self.managedObjectContext];
-    newObject3.order = @0;
+    newObject3.order = @2;
     
-    // At the same time changing the text of the first note
-    newObject.text = @"changed";
+    // At the same time deleting the first object
+    [self.managedObjectContext deleteObject:newObject];
+    
+    // Waiting for the did change expectation
+    [self waitForExpectationsWithTimeout:self.expectationsDefaultTimeout handler:^(NSError *error) {
+        if(error) XCTFail(@"Expectation Failed with error: %@", error);
+        
+        XCTAssertTrue([fetchedResultsController.arrangedObjects isEqualToArray:self.targetArray]);
+    }];
+}
+
+- (void) testMoveInsert
+{
+    
+    // Inserting a new object inside the managedObjectContext
+    Note *newObject = [NSEntityDescription insertNewObjectForEntityForName:@"Note" inManagedObjectContext:self.managedObjectContext];
+    newObject.order = @1;
+    
+    Note *newObject2 = [NSEntityDescription insertNewObjectForEntityForName:@"Note" inManagedObjectContext:self.managedObjectContext];
+    newObject2.order = @3;
+    
+    [self.targetArray addObjectsFromArray:@[newObject, newObject2]];
+    
+    // Processing changes so the object is no longer listed in the "inserted objects"
+    [self.managedObjectContext processPendingChanges];
+    
+    // Creating the fetchedResultsController
+    MRTFetchedResultsController *fetchedResultsController = [self notesFetchedResultsController];
+    [fetchedResultsController performFetch:nil];
+    
+    // Insert a new object between the two
+    Note *newObject3 = [NSEntityDescription insertNewObjectForEntityForName:@"Note" inManagedObjectContext:self.managedObjectContext];
+    newObject3.order = @2;
+    
+    // At the same time changing the order of the first note
+    newObject.order = @4;
 
 
     // Waiting for the did change expectation
