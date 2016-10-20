@@ -199,29 +199,28 @@
 
 #pragma mark - Moves
 
-- (void) testMoves
+- (void) testMovesSwap
 {
+    /*
+     abc -> acb
+     */
+    
     // Inserting a new object inside the managedObjectContext
     Note *newObject = [NSEntityDescription insertNewObjectForEntityForName:@"Note" inManagedObjectContext:self.managedObjectContext];
+    newObject.order = @0;
     newObject.text = @"a";
-    newObject.order = @1;
     
     // Inserting a new object inside the managedObjectContext
     Note *newObject2 = [NSEntityDescription insertNewObjectForEntityForName:@"Note" inManagedObjectContext:self.managedObjectContext];
+    newObject2.order = @1;
     newObject2.text = @"b";
-    newObject2.order = @2;
     
     // Inserting a new object inside the managedObjectContext
     Note *newObject3 = [NSEntityDescription insertNewObjectForEntityForName:@"Note" inManagedObjectContext:self.managedObjectContext];
+    newObject3.order = @2;
     newObject3.text = @"c";
-    newObject3.order = @4;
-
-    // Inserting a new object inside the managedObjectContext
-    Note *newObject4 = [NSEntityDescription insertNewObjectForEntityForName:@"Note" inManagedObjectContext:self.managedObjectContext];
-    newObject4.text = @"d";
-    newObject4.order = @5;
     
-    [self.targetArray addObjectsFromArray:@[newObject, newObject2, newObject3, newObject4]];
+    [self.targetArray addObjectsFromArray:@[newObject, newObject2, newObject3]];
     
     [self.managedObjectContext processPendingChanges];
     
@@ -229,8 +228,8 @@
     MRTFetchedResultsController *fetchedResultsController = [self notesFetchedResultsController];
     [fetchedResultsController performFetch:nil];
     
-    newObject.order = @3;
-    newObject4.order = @1;
+    newObject2.order = @2;
+    newObject3.order = @1;
     
     // Waiting for the did change expectation
     [self waitForExpectationsWithTimeout:self.expectationsDefaultTimeout handler:^(NSError *error) {
@@ -241,8 +240,52 @@
 }
 
 
+- (void) testMovesSimmetricSwap
+{
+    /*
+     abc -> cba
+     */
+    
+    // Inserting a new object inside the managedObjectContext
+    Note *newObject = [NSEntityDescription insertNewObjectForEntityForName:@"Note" inManagedObjectContext:self.managedObjectContext];
+    newObject.order = @0;
+    newObject.text = @"a";
+    
+    // Inserting a new object inside the managedObjectContext
+    Note *newObject2 = [NSEntityDescription insertNewObjectForEntityForName:@"Note" inManagedObjectContext:self.managedObjectContext];
+    newObject2.order = @1;
+    newObject2.text = @"b";
+    
+    // Inserting a new object inside the managedObjectContext
+    Note *newObject3 = [NSEntityDescription insertNewObjectForEntityForName:@"Note" inManagedObjectContext:self.managedObjectContext];
+    newObject3.order = @2;
+    newObject3.text = @"c";
+    
+    [self.targetArray addObjectsFromArray:@[newObject, newObject2, newObject3]];
+    
+    [self.managedObjectContext processPendingChanges];
+    
+    // Creating the fetchedResultsController
+    MRTFetchedResultsController *fetchedResultsController = [self notesFetchedResultsController];
+    [fetchedResultsController performFetch:nil];
+    
+    newObject.order = @2;
+    newObject3.order = @0;
+    
+    // Waiting for the did change expectation
+    [self waitForExpectationsWithTimeout:self.expectationsDefaultTimeout handler:^(NSError *error) {
+        if(error) XCTFail(@"Expectation Failed with error: %@", error);
+        
+        XCTAssertTrue([fetchedResultsController.arrangedObjects isEqualToArray:self.targetArray]);
+    }];
+}
+
 - (void) testMovesAfter
 {
+    /*
+     abc -> bca
+     */
+
     // Inserting a new object inside the managedObjectContext
     Note *newObject = [NSEntityDescription insertNewObjectForEntityForName:@"Note" inManagedObjectContext:self.managedObjectContext];
     newObject.order = @1;
@@ -279,6 +322,10 @@
 
 - (void) testMovesBefore
 {
+    /*
+     abc -> cab
+     */
+
     // Inserting a new object inside the managedObjectContext
     Note *newObject = [NSEntityDescription insertNewObjectForEntityForName:@"Note" inManagedObjectContext:self.managedObjectContext];
     newObject.order = @1;
@@ -314,6 +361,10 @@
 
 - (void) testMovesMiddle
 {
+    /*
+     abc -> bac
+     */
+
     // Inserting a new object inside the managedObjectContext
     Note *newObject = [NSEntityDescription insertNewObjectForEntityForName:@"Note" inManagedObjectContext:self.managedObjectContext];
     newObject.order = @0;
@@ -347,45 +398,12 @@
     }];
 }
 
-- (void) testMovesSwap
-{
-    // Inserting a new object inside the managedObjectContext
-    Note *newObject = [NSEntityDescription insertNewObjectForEntityForName:@"Note" inManagedObjectContext:self.managedObjectContext];
-    newObject.order = @0;
-    newObject.text = @"a";
-    
-    // Inserting a new object inside the managedObjectContext
-    Note *newObject2 = [NSEntityDescription insertNewObjectForEntityForName:@"Note" inManagedObjectContext:self.managedObjectContext];
-    newObject2.order = @1;
-    newObject2.text = @"b";
-    
-    // Inserting a new object inside the managedObjectContext
-    Note *newObject3 = [NSEntityDescription insertNewObjectForEntityForName:@"Note" inManagedObjectContext:self.managedObjectContext];
-    newObject3.order = @2;
-    newObject3.text = @"c";
-    
-    [self.targetArray addObjectsFromArray:@[newObject, newObject2, newObject3]];
-    
-    [self.managedObjectContext processPendingChanges];
-    
-    // Creating the fetchedResultsController
-    MRTFetchedResultsController *fetchedResultsController = [self notesFetchedResultsController];
-    [fetchedResultsController performFetch:nil];
-    
-    newObject.order = @2;
-    newObject3.order = @0;
-
-    // Waiting for the did change expectation
-    [self waitForExpectationsWithTimeout:self.expectationsDefaultTimeout handler:^(NSError *error) {
-        if(error) XCTFail(@"Expectation Failed with error: %@", error);
-        
-        XCTAssertTrue([fetchedResultsController.arrangedObjects isEqualToArray:self.targetArray]);
-    }];
-}
-
-
 - (void) testMovesDoubleHop
 {
+    /*
+     abc -> cba
+     */
+    
     // Inserting a new object inside the managedObjectContext
     Note *newObject = [NSEntityDescription insertNewObjectForEntityForName:@"Note" inManagedObjectContext:self.managedObjectContext];
     newObject.order = @1;
@@ -420,8 +438,94 @@
     }];
 }
 
+- (void) testMovesDoubleHopReverse
+{
+    /*
+     abc -> bca
+     */
+    
+    // Inserting a new object inside the managedObjectContext
+    Note *newObject = [NSEntityDescription insertNewObjectForEntityForName:@"Note" inManagedObjectContext:self.managedObjectContext];
+    newObject.order = @1;
+    newObject.text = @"a";
+    
+    // Inserting a new object inside the managedObjectContext
+    Note *newObject2 = [NSEntityDescription insertNewObjectForEntityForName:@"Note" inManagedObjectContext:self.managedObjectContext];
+    newObject2.order = @2;
+    newObject2.text = @"b";
+    
+    // Inserting a new object inside the managedObjectContext
+    Note *newObject3 = [NSEntityDescription insertNewObjectForEntityForName:@"Note" inManagedObjectContext:self.managedObjectContext];
+    newObject3.order = @3;
+    newObject3.text = @"c";
+    
+    [self.targetArray addObjectsFromArray:@[newObject, newObject2, newObject3]];
+    
+    [self.managedObjectContext processPendingChanges];
+    
+    // Creating the fetchedResultsController
+    MRTFetchedResultsController *fetchedResultsController = [self notesFetchedResultsController];
+    [fetchedResultsController performFetch:nil];
+    
+    newObject2.order = @1;
+    newObject3.order = @2;
+    
+    // Waiting for the did change expectation
+    [self waitForExpectationsWithTimeout:self.expectationsDefaultTimeout handler:^(NSError *error) {
+        if(error) XCTFail(@"Expectation Failed with error: %@", error);
+        
+        XCTAssertTrue([fetchedResultsController.arrangedObjects isEqualToArray:self.targetArray]);
+    }];
+}
+
 - (void) testManyMoves
 {
+    // Inserting a new object inside the managedObjectContext
+    Note *newObject = [NSEntityDescription insertNewObjectForEntityForName:@"Note" inManagedObjectContext:self.managedObjectContext];
+    newObject.text = @"a";
+    newObject.order = @1;
+    
+    // Inserting a new object inside the managedObjectContext
+    Note *newObject2 = [NSEntityDescription insertNewObjectForEntityForName:@"Note" inManagedObjectContext:self.managedObjectContext];
+    newObject2.text = @"b";
+    newObject2.order = @2;
+    
+    // Inserting a new object inside the managedObjectContext
+    Note *newObject3 = [NSEntityDescription insertNewObjectForEntityForName:@"Note" inManagedObjectContext:self.managedObjectContext];
+    newObject3.text = @"c";
+    newObject3.order = @4;
+    
+    // Inserting a new object inside the managedObjectContext
+    Note *newObject4 = [NSEntityDescription insertNewObjectForEntityForName:@"Note" inManagedObjectContext:self.managedObjectContext];
+    newObject4.text = @"d";
+    newObject4.order = @5;
+    
+    [self.targetArray addObjectsFromArray:@[newObject, newObject2, newObject3, newObject4]];
+    
+    [self.managedObjectContext processPendingChanges];
+    
+    // Creating the fetchedResultsController
+    MRTFetchedResultsController *fetchedResultsController = [self notesFetchedResultsController];
+    [fetchedResultsController performFetch:nil];
+    
+    newObject.order = @3;
+    newObject4.order = @1;
+    
+    // Waiting for the did change expectation
+    [self waitForExpectationsWithTimeout:self.expectationsDefaultTimeout handler:^(NSError *error) {
+        if(error) XCTFail(@"Expectation Failed with error: %@", error);
+        
+        XCTAssertTrue([fetchedResultsController.arrangedObjects isEqualToArray:self.targetArray]);
+    }];
+}
+
+
+- (void) testManyMoves2
+{
+    /*
+     abcdef -> cebdaf
+     */
+    
     // Inserting a new object inside the managedObjectContext
     Note *newObject = [NSEntityDescription insertNewObjectForEntityForName:@"Note" inManagedObjectContext:self.managedObjectContext];
     newObject.order = @1;
@@ -468,6 +572,66 @@
     newObject5.order = @2;
     newObject6.order = @6;
 
+    // Waiting for the did change expectation
+    [self waitForExpectationsWithTimeout:self.expectationsDefaultTimeout handler:^(NSError *error) {
+        if(error) XCTFail(@"Expectation Failed with error: %@", error);
+        
+        XCTAssertTrue([fetchedResultsController.arrangedObjects isEqualToArray:self.targetArray]);
+    }];
+}
+
+- (void) testManyMoves3
+{
+    /*
+     abcdef -> cbafed
+     */
+    
+    // Inserting a new object inside the managedObjectContext
+    Note *newObject = [NSEntityDescription insertNewObjectForEntityForName:@"Note" inManagedObjectContext:self.managedObjectContext];
+    newObject.order = @1;
+    newObject.text = @"a";
+    
+    // Inserting a new object inside the managedObjectContext
+    Note *newObject2 = [NSEntityDescription insertNewObjectForEntityForName:@"Note" inManagedObjectContext:self.managedObjectContext];
+    newObject2.order = @2;
+    newObject2.text = @"b";
+    
+    // Inserting a new object inside the managedObjectContext
+    Note *newObject3 = [NSEntityDescription insertNewObjectForEntityForName:@"Note" inManagedObjectContext:self.managedObjectContext];
+    newObject3.order = @3;
+    newObject3.text = @"c";
+    
+    // Inserting a new object inside the managedObjectContext
+    Note *newObject4 = [NSEntityDescription insertNewObjectForEntityForName:@"Note" inManagedObjectContext:self.managedObjectContext];
+    newObject4.order = @4;
+    newObject4.text = @"d";
+    
+    // Inserting a new object inside the managedObjectContext
+    Note *newObject5 = [NSEntityDescription insertNewObjectForEntityForName:@"Note" inManagedObjectContext:self.managedObjectContext];
+    newObject5.order = @5;
+    newObject5.text = @"e";
+    
+    
+    // Inserting a new object inside the managedObjectContext
+    Note *newObject6 = [NSEntityDescription insertNewObjectForEntityForName:@"Note" inManagedObjectContext:self.managedObjectContext];
+    newObject6.order = @6;
+    newObject6.text = @"f";
+    
+    [self.targetArray addObjectsFromArray:@[newObject, newObject2, newObject3, newObject4, newObject5, newObject6]];
+    
+    [self.managedObjectContext processPendingChanges];
+    
+    // Creating the fetchedResultsController
+    MRTFetchedResultsController *fetchedResultsController = [self notesFetchedResultsController];
+    [fetchedResultsController performFetch:nil];
+    
+    newObject.order = @3;
+    newObject2.order = @2;
+    newObject3.order = @1;
+    newObject4.order = @6;
+    newObject5.order = @5;
+    newObject6.order = @4;
+    
     // Waiting for the did change expectation
     [self waitForExpectationsWithTimeout:self.expectationsDefaultTimeout handler:^(NSError *error) {
         if(error) XCTFail(@"Expectation Failed with error: %@", error);
@@ -608,6 +772,7 @@
             [self.targetArray removeObjectAtIndex:progressiveChangeIndex];
             break;
         case MRTFetchedResultsChangeInsert:
+            NSLog(@"inserted %@ at %lu", [anObject text], newIndex);
             [self.targetArray insertObject:anObject atIndex:newIndex];
             break;
         case MRTFetchedResultsChangeUpdate:

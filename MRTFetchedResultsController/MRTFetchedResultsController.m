@@ -317,7 +317,7 @@ const NSString *SFNewContainerKey = @"SFNewContainerKey";
         }
     }
     
-    // Resorting the newContainer if needed
+    // Resorting the arrays
     NSArray *sortDescriptors = [fetchRequest sortDescriptors];
     if ([sortDescriptors count]) {
         [newContainer sortUsingDescriptors:sortDescriptors];
@@ -394,6 +394,22 @@ const NSString *SFNewContainerKey = @"SFNewContainerKey";
     // Tmp array used to keep track of middle states
     NSMutableArray *progressiveArray = [oldContainer mutableCopy];
 
+    // Sorting the updated objects to notify first the objects that have moved the most
+    updatedObjects = [updatedObjects sortedArrayUsingComparator:^NSComparisonResult(id  _Nonnull obj1, id  _Nonnull obj2) {
+        NSInteger obj1OldIndex = [oldContainer indexOfObject:obj1];
+        NSInteger obj1NewIndex = [newContainer indexOfObject:obj1];
+        NSInteger obj1NumberOfMoves = labs(obj1NewIndex - obj1OldIndex);
+        
+        NSInteger obj2OldIndex = [oldContainer indexOfObject:obj2];
+        NSInteger obj2NewIndex = [newContainer indexOfObject:obj2];
+        NSInteger obj2NumberOfMoves = labs(obj2NewIndex - obj2OldIndex);
+        
+        if (obj1NumberOfMoves == obj2NumberOfMoves) { return NSOrderedSame; }
+        if (obj1NumberOfMoves > obj2NumberOfMoves) {return NSOrderedAscending; }
+        return NSOrderedDescending;
+        
+    }];
+    
     // DELETED
     for (id obj in deletedObjects) {
         NSUInteger index = [oldContainer indexOfObject:obj];
@@ -413,7 +429,6 @@ const NSString *SFNewContainerKey = @"SFNewContainerKey";
     }
     
     // UPDATED OR MOVED
-    // Using the oldContainer objects to get all the possible moves (even of objects that are not specifically updated)
     for (id obj in updatedObjects) {
     
         NSUInteger index = [oldContainer indexOfObject:obj];
@@ -431,20 +446,6 @@ const NSString *SFNewContainerKey = @"SFNewContainerKey";
             [self delegateDidChangeObject:obj atIndex:index progressiveChangeIndex:progressiveIndex forChangeType:MRTFetchedResultsChangeMove newIndex:newIndex];
         
             [progressiveArray removeObjectAtIndex:progressiveIndex];
-            [progressiveArray insertObject:obj atIndex:newIndex];
-        }
-    }
-    
-    // OUT OF PLACE OBJECTS
-    // Sometimes just moving updated objects isn't enought, checking if some object is out of place
-    if (![progressiveArray isEqualToArray:newContainer]) {
-        for (id obj in newContainer) {
-            NSUInteger index = [progressiveArray indexOfObject:obj];
-            NSUInteger newIndex = [newContainer indexOfObject:obj];
-
-            [self delegateDidChangeObject:obj atIndex:index progressiveChangeIndex:index forChangeType:MRTFetchedResultsChangeMove newIndex:newIndex];
-
-            [progressiveArray removeObjectAtIndex:index];
             [progressiveArray insertObject:obj atIndex:newIndex];
         }
     }
