@@ -39,14 +39,11 @@ const NSString *SFNewContainerKey = @"SFNewContainerKey";
 {
     self = [super init];
     if (self) {
+        
         _managedObjectContext = context;
         _fetchRequest = request;
-
-        [[NSNotificationCenter defaultCenter] addObserver:self
-                                                 selector:@selector(managedObjectContextObjectsDidChange:)
-                                                     name:NSManagedObjectContextObjectsDidChangeNotification
-                                                   object:_managedObjectContext];
     }
+
     return self;
 }
 
@@ -62,11 +59,25 @@ const NSString *SFNewContainerKey = @"SFNewContainerKey";
 - (BOOL)performFetch:(NSError**)error
 {
     if (!self.fetchRequest) { return NO; }
+    
+    [[NSNotificationCenter defaultCenter] removeObserver:self];
+    
     _fetchedObjects = [NSMutableArray arrayWithArray:[self.managedObjectContext executeFetchRequest:self.fetchRequest error:error]];
 
-    [self updateArrangedObjects];
+    BOOL success = (_fetchedObjects != nil);
     
-    return (_fetchedObjects != nil);
+    if (success) {
+        [self updateArrangedObjects];
+        
+        // Processing changes to avoid notification about objects we alrady have
+        [self.managedObjectContext processPendingChanges];
+        [[NSNotificationCenter defaultCenter] addObserver:self
+                                                 selector:@selector(managedObjectContextObjectsDidChange:)
+                                                     name:NSManagedObjectContextObjectsDidChangeNotification
+                                                   object:_managedObjectContext];
+    }
+    
+    return success;
 }
 
 - (id)objectAtIndex:(NSUInteger)index

@@ -134,8 +134,6 @@
     newObject3.text = @"c";
     
     [self.targetArray addObjectsFromArray:@[newObject, newObject2, newObject3]];
-
-    [self.managedObjectContext processPendingChanges];
     
     // Creating the fetchedResultsController
     MRTFetchedResultsController *fetchedResultsController = [self notesFetchedResultsController];
@@ -176,10 +174,7 @@
     newObject4.order = @4;
     newObject4.text = @"d";
 
-    
     [self.targetArray addObjectsFromArray:@[newObject, newObject2, newObject3, newObject4]];
-    
-    [self.managedObjectContext processPendingChanges];
     
     // Creating the fetchedResultsController
     MRTFetchedResultsController *fetchedResultsController = [self notesFetchedResultsController];
@@ -222,8 +217,6 @@
     
     [self.targetArray addObjectsFromArray:@[newObject, newObject2, newObject3]];
     
-    [self.managedObjectContext processPendingChanges];
-    
     // Creating the fetchedResultsController
     MRTFetchedResultsController *fetchedResultsController = [self notesFetchedResultsController];
     [fetchedResultsController performFetch:nil];
@@ -263,8 +256,6 @@
     
     [self.targetArray addObjectsFromArray:@[newObject, newObject2, newObject3]];
     
-    [self.managedObjectContext processPendingChanges];
-    
     // Creating the fetchedResultsController
     MRTFetchedResultsController *fetchedResultsController = [self notesFetchedResultsController];
     [fetchedResultsController performFetch:nil];
@@ -302,8 +293,6 @@
     newObject3.text = @"c";
     
     [self.targetArray addObjectsFromArray:@[newObject, newObject2, newObject3]];
-    
-    [self.managedObjectContext processPendingChanges];
     
     // Creating the fetchedResultsController
     MRTFetchedResultsController *fetchedResultsController = [self notesFetchedResultsController];
@@ -343,8 +332,6 @@
     
     [self.targetArray addObjectsFromArray:@[newObject, newObject2, newObject3]];
     
-    [self.managedObjectContext processPendingChanges];
-    
     // Creating the fetchedResultsController
     MRTFetchedResultsController *fetchedResultsController = [self notesFetchedResultsController];
     [fetchedResultsController performFetch:nil];
@@ -381,9 +368,7 @@
     newObject3.text = @"c";
     
     [self.targetArray addObjectsFromArray:@[newObject, newObject2, newObject3]];
-    
-    [self.managedObjectContext processPendingChanges];
-    
+        
     // Creating the fetchedResultsController
     MRTFetchedResultsController *fetchedResultsController = [self notesFetchedResultsController];
     [fetchedResultsController performFetch:nil];
@@ -420,8 +405,6 @@
     newObject3.text = @"c";
     
     [self.targetArray addObjectsFromArray:@[newObject, newObject2, newObject3]];
-    
-    [self.managedObjectContext processPendingChanges];
     
     // Creating the fetchedResultsController
     MRTFetchedResultsController *fetchedResultsController = [self notesFetchedResultsController];
@@ -460,8 +443,6 @@
     newObject3.text = @"c";
     
     [self.targetArray addObjectsFromArray:@[newObject, newObject2, newObject3]];
-    
-    [self.managedObjectContext processPendingChanges];
     
     // Creating the fetchedResultsController
     MRTFetchedResultsController *fetchedResultsController = [self notesFetchedResultsController];
@@ -502,7 +483,6 @@
     
     [self.targetArray addObjectsFromArray:@[newObject, newObject2, newObject3, newObject4]];
     
-    [self.managedObjectContext processPendingChanges];
     
     // Creating the fetchedResultsController
     MRTFetchedResultsController *fetchedResultsController = [self notesFetchedResultsController];
@@ -558,8 +538,6 @@
     newObject6.text = @"f";
 
     [self.targetArray addObjectsFromArray:@[newObject, newObject2, newObject3, newObject4, newObject5, newObject6]];
-    
-    [self.managedObjectContext processPendingChanges];
     
     // Creating the fetchedResultsController
     MRTFetchedResultsController *fetchedResultsController = [self notesFetchedResultsController];
@@ -619,8 +597,6 @@
     
     [self.targetArray addObjectsFromArray:@[newObject, newObject2, newObject3, newObject4, newObject5, newObject6]];
     
-    [self.managedObjectContext processPendingChanges];
-    
     // Creating the fetchedResultsController
     MRTFetchedResultsController *fetchedResultsController = [self notesFetchedResultsController];
     [fetchedResultsController performFetch:nil];
@@ -654,9 +630,6 @@
     
     [self.targetArray addObjectsFromArray:@[newObject, newObject2]];
     
-    // Processing changes so the object is no longer listed in the "inserted objects"
-    [self.managedObjectContext processPendingChanges];
-    
     // Creating the fetchedResultsController
     MRTFetchedResultsController *fetchedResultsController = [self notesFetchedResultsController];
     [fetchedResultsController performFetch:nil];
@@ -688,9 +661,6 @@
     newObject2.order = @3;
     
     [self.targetArray addObjectsFromArray:@[newObject, newObject2]];
-    
-    // Processing changes so the object is no longer listed in the "inserted objects"
-    [self.managedObjectContext processPendingChanges];
     
     // Creating the fetchedResultsController
     MRTFetchedResultsController *fetchedResultsController = [self notesFetchedResultsController];
@@ -732,8 +702,6 @@
     newObject4.order = @5;
     
     [self.targetArray addObjectsFromArray:@[newObject, newObject2, newObject3, newObject4]];
-    
-    [self.managedObjectContext processPendingChanges];
     
     // Creating the fetchedResultsController
     MRTFetchedResultsController *fetchedResultsController = [self notesFetchedResultsController];

@@ -112,6 +112,28 @@
     }];
 }
 
+// Inserting one object that match the request expecting one insert
+- (void) testInsertionAndFetchInSameRunloop
+{
+    // Inserting a new object inside the managedObjectContext
+    [NSEntityDescription insertNewObjectForEntityForName:@"Note" inManagedObjectContext:self.managedObjectContext];
+
+    // Creating the fetchedResultsController
+    MRTFetchedResultsController *fetchedResultsController = [self notesFetchedResultsController];
+    [fetchedResultsController performFetch:nil];
+    
+    CFRunLoopRunInMode( kCFRunLoopDefaultMode, self.expectationsDefaultTimeout, NO );
+
+    // Checking number and type of events
+    [self checkExpectedNumberOfInserts:0 deletes:0 updates:0 moves:0];
+    
+    // Checking number of delegate calls
+    [self checkNumberOfWillDidChangeCalls:0];
+    
+    // Checking total number of object in the controller
+    XCTAssertEqual([fetchedResultsController count], 1, @"Number of object in the fetchedResultsController doesn't match");
+}
+
 
 - (void) testInsertionOrder
 {
@@ -211,9 +233,6 @@
     // Inserting a new object inside the managedObjectContext
     Note *newObject = [NSEntityDescription insertNewObjectForEntityForName:@"Note" inManagedObjectContext:self.managedObjectContext];
     
-    // Processing changes so the object is no longer listed in the "inserted objects"
-    [self.managedObjectContext processPendingChanges];
-
     // Creating the fetchedResultsController
     MRTFetchedResultsController *fetchedResultsController = [self notesFetchedResultsController];
     [fetchedResultsController performFetch:nil];
@@ -247,8 +266,6 @@
     Note *newObject = [NSEntityDescription insertNewObjectForEntityForName:@"Note" inManagedObjectContext:self.managedObjectContext];
     newObject.trashed = @YES;
     
-    [self.managedObjectContext processPendingChanges];
-
     // Creating the fetchedResultsController
     MRTFetchedResultsController *fetchedResultsController = [self untrashedNotesFetchedResultsController];
     [fetchedResultsController performFetch:nil];
@@ -284,9 +301,7 @@
     // Inserting a matching object
     Note *newObject = [NSEntityDescription insertNewObjectForEntityForName:@"Note" inManagedObjectContext:self.managedObjectContext];
     newObject.trashed = @NO;
-    
-    [self.managedObjectContext processPendingChanges];
-    
+        
     // Creating the fetchedResultsController
     MRTFetchedResultsController *fetchedResultsController = [self untrashedNotesFetchedResultsController];
     [fetchedResultsController performFetch:nil];
@@ -323,9 +338,6 @@
     // Inserting a new object inside the managedObjectContext
     Note *newObject = [NSEntityDescription insertNewObjectForEntityForName:@"Note" inManagedObjectContext:self.managedObjectContext];
     
-    // Processing changes so the object is no longer listed in the "inserted objects"
-    [self.managedObjectContext processPendingChanges];
-
     // Creating the fetchedResultsController
     MRTFetchedResultsController *fetchedResultsController = [self notesFetchedResultsController];
     [fetchedResultsController performFetch:nil];
@@ -366,9 +378,6 @@
     Note *newObject3 = [NSEntityDescription insertNewObjectForEntityForName:@"Note" inManagedObjectContext:self.managedObjectContext];
     newObject3.order = @2;
     
-    // Processing changes so the object is no longer listed in the "inserted objects"
-    [self.managedObjectContext processPendingChanges];
-
     // Creating the fetchedResultsController
     MRTFetchedResultsController *fetchedResultsController = [self notesFetchedResultsController];
     [fetchedResultsController performFetch:nil];
@@ -399,8 +408,6 @@
     // Inserting a matching object
     Note *newObject = [NSEntityDescription insertNewObjectForEntityForName:@"Note" inManagedObjectContext:self.managedObjectContext];
     newObject.trashed = @NO;
-    
-    [self.managedObjectContext processPendingChanges];
     
     // Creating the fetchedResultsController
     MRTFetchedResultsController *fetchedResultsController = [self untrashedNotesFetchedResultsController];
@@ -437,7 +444,6 @@
     Note *newObject = [NSEntityDescription insertNewObjectForEntityForName:@"Note" inManagedObjectContext:self.managedObjectContext];
     newObject.trashed = @YES;
     
-    [self.managedObjectContext processPendingChanges];
     
     // Creating the fetchedResultsController
     MRTFetchedResultsController *fetchedResultsController = [self untrashedNotesFetchedResultsController];
@@ -467,8 +473,6 @@
     // Inserting a matching object
     Note *newObject = [NSEntityDescription insertNewObjectForEntityForName:@"Note" inManagedObjectContext:self.managedObjectContext];
     newObject.trashed = @NO;
-    
-    [self.managedObjectContext processPendingChanges];
     
     // Creating the fetchedResultsController
     MRTFetchedResultsController *fetchedResultsController = [self untrashedNotesFetchedResultsController];
@@ -509,9 +513,6 @@
     Note *newObject2 = [NSEntityDescription insertNewObjectForEntityForName:@"Note" inManagedObjectContext:self.managedObjectContext];
     newObject2.order = @2;
     
-    // Processing changes so the object is no longer listed in the "inserted objects"
-    [self.managedObjectContext processPendingChanges];
-
     // Creating the fetchedResultsController
     MRTFetchedResultsController *fetchedResultsController = [self notesFetchedResultsController];
     [fetchedResultsController performFetch:nil];
@@ -550,9 +551,6 @@
     Note *newObject2 = [NSEntityDescription insertNewObjectForEntityForName:@"Note" inManagedObjectContext:self.managedObjectContext];
     newObject2.order = @2;
     
-    // Processing changes so the object is no longer listed in the "inserted objects"
-    [self.managedObjectContext processPendingChanges];
-    
     // Creating the fetchedResultsController
     MRTFetchedResultsController *fetchedResultsController = [self notesFetchedResultsController];
     [fetchedResultsController performFetch:nil];
@@ -588,9 +586,6 @@
     
     Note *newObject2 = [NSEntityDescription insertNewObjectForEntityForName:@"Note" inManagedObjectContext:self.managedObjectContext];
     newObject2.order = @2;
-    
-    // Processing changes so the object is no longer listed in the "inserted objects"
-    [self.managedObjectContext processPendingChanges];
     
     // Creating the fetchedResultsController
     MRTFetchedResultsController *fetchedResultsController = [self notesFetchedResultsController];
@@ -637,9 +632,6 @@
     newObject2.order = @2;
     newObject2.trashed = @NO;
     
-    // Processing changes so the object is no longer listed in the "inserted objects"
-    [self.managedObjectContext processPendingChanges];
-    
     // Creating the fetchedResultsController
     MRTFetchedResultsController *fetchedResultsController = [self untrashedNotesFetchedResultsController];
     [fetchedResultsController performFetch:nil];
@@ -677,9 +669,6 @@
     Note *newObject2 = [NSEntityDescription insertNewObjectForEntityForName:@"Note" inManagedObjectContext:self.managedObjectContext];
     newObject2.order = @2;
     newObject2.trashed = @YES;
-    
-    // Processing changes so the object is no longer listed in the "inserted objects"
-    [self.managedObjectContext processPendingChanges];
     
     // Creating the fetchedResultsController
     MRTFetchedResultsController *fetchedResultsController = [self untrashedNotesFetchedResultsController];
@@ -840,9 +829,6 @@
     newObject4.order = @6;
     newObject4.text = @"4";
 
-    // Processing changes so the object is no longer listed in the "inserted objects"
-    [self.managedObjectContext processPendingChanges];
-
     // Creating the fetchedResultsController
     MRTFetchedResultsController *fetchedResultsController = [self notesFetchedResultsController];
     [fetchedResultsController performFetch:nil];
@@ -882,9 +868,6 @@
     // Inserting a new object inside the managedObjectContext
     Note *newObject2 = [NSEntityDescription insertNewObjectForEntityForName:@"Note" inManagedObjectContext:self.managedObjectContext];
     newObject2.order = @2;
-
-    // Processing changes so the object is no longer listed in the "inserted objects"
-    [self.managedObjectContext processPendingChanges];
 
     // Creating the fetchedResultsController
     MRTFetchedResultsController *fetchedResultsController = [self notesFetchedResultsController];
@@ -966,9 +949,6 @@
     Note *newObject3 = [NSEntityDescription insertNewObjectForEntityForName:@"Note" inManagedObjectContext:self.managedObjectContext];
     newObject3.order = @3;
     
-    // Processing changes so the object is no longer listed in the "inserted objects"
-    [self.managedObjectContext processPendingChanges];
-
     // Creating the fetchedResultsController
     MRTFetchedResultsController *fetchedResultsController = [self notesFetchedResultsController];
     [fetchedResultsController performFetch:nil];
@@ -1055,9 +1035,6 @@
     // Inserting a new object inside the managedObjectContext
     Note *newObject3 = [NSEntityDescription insertNewObjectForEntityForName:@"Note" inManagedObjectContext:self.managedObjectContext];
     newObject3.order = @3;
-    
-    // Processing changes so the object is no longer listed in the "inserted objects"
-    [self.managedObjectContext processPendingChanges];
 
     // Creating the fetchedResultsController
     MRTFetchedResultsController *fetchedResultsController = [self notesFetchedResultsController];
@@ -1106,9 +1083,6 @@
     Note *newObject3 = [NSEntityDescription insertNewObjectForEntityForName:@"Note" inManagedObjectContext:self.managedObjectContext];
     newObject3.order = @3;
     newObject3.trashed = @NO;
-
-    // Processing changes so the object is no longer listed in the "inserted objects"
-    [self.managedObjectContext processPendingChanges];
     
     // Creating the fetchedResultsController
     MRTFetchedResultsController *fetchedResultsController = [self untrashedNotesFetchedResultsController];
