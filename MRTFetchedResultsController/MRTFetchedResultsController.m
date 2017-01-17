@@ -448,7 +448,8 @@ const NSString *SFNewContainerKey = @"SFNewContainerKey";
         NSUInteger progressiveIndex = [progressiveArray indexOfObject:obj];
         
         // Same index, the object was just updated
-        if (index == newIndex && progressiveIndex == newIndex) {
+        if ((delegateHas.delegateHasDidChangeObject && index == newIndex) ||
+            (delegateHas.delegateHasDidChangeObjectWithProgressiveChanges && progressiveIndex == newIndex)) {
             [self delegateDidChangeObject:obj atIndex:index progressiveChangeIndex:progressiveIndex forChangeType:MRTFetchedResultsChangeUpdate newIndex:index];
         }
         
