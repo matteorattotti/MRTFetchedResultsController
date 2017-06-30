@@ -556,6 +556,8 @@
         
         XCTAssertTrue([fetchedResultsController.arrangedObjects isEqualToArray:self.targetArray]);
     }];
+
+
 }
 
 - (void) testManyMoves3
@@ -615,6 +617,109 @@
         XCTAssertTrue([fetchedResultsController.arrangedObjects isEqualToArray:self.targetArray]);
     }];
 }
+
+
+- (void) testManyMoves4
+{
+    /*
+     abcdef -> bcdfae
+     */
+    
+    // Inserting a new object inside the managedObjectContext
+    Note *newObject = [NSEntityDescription insertNewObjectForEntityForName:@"Note" inManagedObjectContext:self.managedObjectContext];
+    newObject.order = @1;
+    newObject.text = @"a";
+    
+    // Inserting a new object inside the managedObjectContext
+    Note *newObject2 = [NSEntityDescription insertNewObjectForEntityForName:@"Note" inManagedObjectContext:self.managedObjectContext];
+    newObject2.order = @10;
+    newObject2.text = @"b";
+    
+    // Inserting a new object inside the managedObjectContext
+    Note *newObject3 = [NSEntityDescription insertNewObjectForEntityForName:@"Note" inManagedObjectContext:self.managedObjectContext];
+    newObject3.order = @100;
+    newObject3.text = @"c";
+    
+    // Inserting a new object inside the managedObjectContext
+    Note *newObject4 = [NSEntityDescription insertNewObjectForEntityForName:@"Note" inManagedObjectContext:self.managedObjectContext];
+    newObject4.order = @1000;
+    newObject4.text = @"b";
+    
+    // Inserting a new object inside the managedObjectContext
+    Note *newObject5 = [NSEntityDescription insertNewObjectForEntityForName:@"Note" inManagedObjectContext:self.managedObjectContext];
+    newObject5.order = @10000;
+    newObject5.text = @"c";
+    
+    
+    // Inserting a new object inside the managedObjectContext
+    Note *newObject6 = [NSEntityDescription insertNewObjectForEntityForName:@"Note" inManagedObjectContext:self.managedObjectContext];
+    newObject6.order = @100000;
+    newObject6.text = @"d";
+    
+    [self.targetArray addObjectsFromArray:@[newObject, newObject2, newObject3, newObject4, newObject5, newObject6]];
+    
+    [self.managedObjectContext processPendingChanges];
+    
+    // Creating the fetchedResultsController
+    MRTFetchedResultsController *fetchedResultsController = [self notesFetchedResultsController];
+    [fetchedResultsController performFetch:nil];
+    
+    newObject.order = @9999;
+    newObject6.order = @1001;
+    
+    // Waiting for the did change expectation
+    [self waitForExpectationsWithTimeout:self.expectationsDefaultTimeout handler:^(NSError *error) {
+        if(error) XCTFail(@"Expectation Failed with error: %@", error);
+        
+        XCTAssertTrue([fetchedResultsController.arrangedObjects isEqualToArray:self.targetArray]);
+    }];
+}
+
+
+- (void) testManyMoves5
+{
+    /*
+     abcd -> bcad
+     */
+    
+    // Inserting a new object inside the managedObjectContext
+    Note *newObject = [NSEntityDescription insertNewObjectForEntityForName:@"Note" inManagedObjectContext:self.managedObjectContext];
+    newObject.order = @1;
+    newObject.text = @"a";
+    
+    // Inserting a new object inside the managedObjectContext
+    Note *newObject2 = [NSEntityDescription insertNewObjectForEntityForName:@"Note" inManagedObjectContext:self.managedObjectContext];
+    newObject2.order = @10;
+    newObject2.text = @"b";
+    
+    // Inserting a new object inside the managedObjectContext
+    Note *newObject3 = [NSEntityDescription insertNewObjectForEntityForName:@"Note" inManagedObjectContext:self.managedObjectContext];
+    newObject3.order = @100;
+    newObject3.text = @"c";
+    
+    // Inserting a new object inside the managedObjectContext
+    Note *newObject4 = [NSEntityDescription insertNewObjectForEntityForName:@"Note" inManagedObjectContext:self.managedObjectContext];
+    newObject4.order = @1000;
+    newObject4.text = @"d";
+    
+    [self.targetArray addObjectsFromArray:@[newObject, newObject2, newObject3, newObject4]];
+    
+    [self.managedObjectContext processPendingChanges];
+    
+    // Creating the fetchedResultsController
+    MRTFetchedResultsController *fetchedResultsController = [self notesFetchedResultsController];
+    [fetchedResultsController performFetch:nil];
+    
+    newObject.order = @999;
+    
+    // Waiting for the did change expectation
+    [self waitForExpectationsWithTimeout:self.expectationsDefaultTimeout handler:^(NSError *error) {
+        if(error) XCTFail(@"Expectation Failed with error: %@", error);
+        
+        XCTAssertTrue([fetchedResultsController.arrangedObjects isEqualToArray:self.targetArray]);
+    }];
+}
+
 
 #pragma mark - Multiple changes
 
@@ -732,24 +837,25 @@
 }
 
 
-- (void)controller:(MRTFetchedResultsController *)controller didChangeObject:(id)anObject atIndex:(NSUInteger)index progressiveChangeIndex:(NSUInteger) progressiveChangeIndex forChangeType:(MRTFetchedResultsChangeType)type newIndex:(NSUInteger)newIndex;
+- (void)controller:(MRTFetchedResultsController *)controller didChangeObject:(id)anObject atIndex:(NSUInteger)index progressiveIndex:(NSUInteger) progressiveIndex forChangeType:(MRTFetchedResultsChangeType)type newIndex:(NSUInteger)newIndex newProgressiveIndex:(NSUInteger)newProgressiveIndex;
 {
     switch (type) {
         case MRTFetchedResultsChangeDelete:
-            NSLog(@"deleted %@ at %lu", [anObject text], progressiveChangeIndex);
-            [self.targetArray removeObjectAtIndex:progressiveChangeIndex];
+            NSLog(@"deleted %@ at %lu", [anObject text], progressiveIndex);
+            [self.targetArray removeObjectAtIndex:progressiveIndex];
             break;
         case MRTFetchedResultsChangeInsert:
-            NSLog(@"inserted %@ at %lu", [anObject text], newIndex);
-            [self.targetArray insertObject:anObject atIndex:newIndex];
+            NSLog(@"inserted %@ at %lu", [anObject text], newProgressiveIndex);
+            [self.targetArray insertObject:anObject atIndex:newProgressiveIndex];
             break;
         case MRTFetchedResultsChangeUpdate:
-            NSLog(@"update %@ at %lu", [anObject text], progressiveChangeIndex);
+            NSLog(@"update %@ at %lu", [anObject text], progressiveIndex);
             break;
         case MRTFetchedResultsChangeMove:
-            NSLog(@"move %@ from %lu in %lu", [anObject text], (unsigned long)progressiveChangeIndex, (unsigned long)newIndex);
-            [self.targetArray removeObjectAtIndex:progressiveChangeIndex];
-            [self.targetArray insertObject:anObject atIndex:newIndex];
+            NSLog(@"move %@ from %lu in %lu", [anObject text], (unsigned long)progressiveIndex, (unsigned long)newProgressiveIndex);
+            [self.targetArray removeObjectAtIndex:progressiveIndex];
+            [self.targetArray insertObject:anObject atIndex:newProgressiveIndex];
+            NSLog(@"target %@", self.targetArray);
             break;
         default:
             break;

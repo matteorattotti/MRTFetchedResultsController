@@ -23,7 +23,9 @@ typedef NSUInteger MRTFetchedResultsChangeType;
 
 @property (nonatomic, assign) id<MRTFetchedResultsControllerDelegate> delegate;
 
-/** Objects fetched from the managed object context. -performFetch: must be called before accessing fetchedObjects, otherwise a nil array will be returned */
+/** 
+ Objects fetched from the managed object context. -performFetch: must be called before accessing fetchedObjects, otherwise a nil array will be returned 
+ */
 @property (nonatomic, retain, readonly) NSArray *fetchedObjects;
 
 /** 
@@ -91,10 +93,11 @@ typedef NSUInteger MRTFetchedResultsChangeType;
  @param controller The fetched results controller
  @param anObject The object that was updated, deleted, inserted, or moved
  @param index The original index of the object. If the object was inserted and did not exist previously, this will be NSNotFound
- @param progressiveChangeIndex the index corrected keeping in consideration the previous changes in the same batch (Usefull for keeping another array in sync, or for macOS NSTableView as it does't batch changes like on iOS
+ @param progressiveIndex the original index corrected keeping in consideration the previous change in the same batch (Usefull for keeping another array in sync, or for macOS NSTableView as it does't batch changes like on iOS
  @param type The type of change (update, insert, delete, or move)
  @param newIndex The new index of the object. If the object was deleted, the newIndex will be NSNotFound.
+ @param newProgressiveIndex new index of the object keeping in consideration the previous change in the same batch.
  */
-- (void)controller:(MRTFetchedResultsController *)controller didChangeObject:(id)anObject atIndex:(NSUInteger)index progressiveChangeIndex:(NSUInteger) progressiveChangeIndex forChangeType:(MRTFetchedResultsChangeType)type newIndex:(NSUInteger)newIndex;
+- (void)controller:(MRTFetchedResultsController *)controller didChangeObject:(id)anObject atIndex:(NSUInteger)index progressiveIndex:(NSUInteger) progressiveIndex forChangeType:(MRTFetchedResultsChangeType)type newIndex:(NSUInteger)newIndex newProgressiveIndex:(NSUInteger) newProgressiveIndex;
 
 @end

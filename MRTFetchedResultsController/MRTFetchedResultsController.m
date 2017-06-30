@@ -108,7 +108,7 @@ const NSString *SFNewContainerKey = @"SFNewContainerKey";
     delegateHas.delegateHasWillChangeContent = [_delegate respondsToSelector:@selector(controllerWillChangeContent:)];
     delegateHas.delegateHasDidChangeContent  = [_delegate respondsToSelector:@selector(controllerDidChangeContent:)];
     delegateHas.delegateHasDidChangeObject   = [_delegate respondsToSelector:@selector(controller:didChangeObject:atIndex:forChangeType:newIndex:)];
-    delegateHas.delegateHasDidChangeObjectWithProgressiveChanges = [_delegate respondsToSelector:@selector(controller:didChangeObject:atIndex:progressiveChangeIndex:forChangeType:newIndex:)];
+    delegateHas.delegateHasDidChangeObjectWithProgressiveChanges = [_delegate respondsToSelector:@selector(controller:didChangeObject:atIndex:progressiveIndex:forChangeType:newIndex:newProgressiveIndex:)];
 }
 
 - (void)setSortDescriptors:(NSArray *)sortDescriptors
@@ -384,12 +384,12 @@ const NSString *SFNewContainerKey = @"SFNewContainerKey";
     }
 }
 
-- (void)delegateDidChangeObject:(id)anObject atIndex:(NSUInteger)index progressiveChangeIndex:(NSUInteger) progressiveChangeIndex forChangeType:(MRTFetchedResultsChangeType)type newIndex:(NSUInteger)newIndex
+- (void)delegateDidChangeObject:(id)anObject atIndex:(NSUInteger)index progressiveIndex:(NSUInteger) progressiveIndex forChangeType:(MRTFetchedResultsChangeType)type newIndex:(NSUInteger)newIndex newProgressiveIndex:(NSUInteger) newProgressiveIndex
 {
     // NSLog(@"Changing object: %@\nAt index: %lu\nChange type: %d\nNew index: %lu", anObject, index, (int)type, newIndex);
     
     if (delegateHas.delegateHasDidChangeObjectWithProgressiveChanges) {
-        [self.delegate controller:self didChangeObject:anObject atIndex:index progressiveChangeIndex:progressiveChangeIndex forChangeType:type newIndex:newIndex];
+        [self.delegate controller:self didChangeObject:anObject atIndex:index progressiveIndex:progressiveIndex forChangeType:type newIndex:newIndex newProgressiveIndex:newProgressiveIndex];
     }
     else if (delegateHas.delegateHasDidChangeObject) {
         [self.delegate controller:self didChangeObject:anObject atIndex:index forChangeType:type newIndex:newIndex];
@@ -404,22 +404,8 @@ const NSString *SFNewContainerKey = @"SFNewContainerKey";
 {
     // Tmp array used to keep track of middle states
     NSMutableArray *progressiveArray = [oldContainer mutableCopy];
-
-    // Sorting the updated objects to notify first the objects that have moved the most
-    updatedObjects = [updatedObjects sortedArrayUsingComparator:^NSComparisonResult(id  _Nonnull obj1, id  _Nonnull obj2) {
-        NSInteger obj1OldIndex = [oldContainer indexOfObject:obj1];
-        NSInteger obj1NewIndex = [newContainer indexOfObject:obj1];
-        NSInteger obj1NumberOfMoves = labs(obj1NewIndex - obj1OldIndex);
-        
-        NSInteger obj2OldIndex = [oldContainer indexOfObject:obj2];
-        NSInteger obj2NewIndex = [newContainer indexOfObject:obj2];
-        NSInteger obj2NumberOfMoves = labs(obj2NewIndex - obj2OldIndex);
-        
-        if (obj1NumberOfMoves == obj2NumberOfMoves) { return NSOrderedSame; }
-        if (obj1NumberOfMoves > obj2NumberOfMoves) {return NSOrderedAscending; }
-        return NSOrderedDescending;
-        
-    }];
+    
+    BOOL wantProgressiveChanges = delegateHas.delegateHasDidChangeObjectWithProgressiveChanges;
     
     // DELETED
     for (id obj in deletedObjects) {
@@ -428,7 +414,7 @@ const NSString *SFNewContainerKey = @"SFNewContainerKey";
         
         [progressiveArray removeObjectAtIndex:progressiveIndex];
         
-        [self delegateDidChangeObject:obj atIndex:index progressiveChangeIndex:progressiveIndex forChangeType:MRTFetchedResultsChangeDelete newIndex:NSNotFound];
+        [self delegateDidChangeObject:obj atIndex:index progressiveIndex:progressiveIndex forChangeType:MRTFetchedResultsChangeDelete newIndex:NSNotFound newProgressiveIndex:NSNotFound];
     }
     
     // INSERTED
@@ -436,29 +422,41 @@ const NSString *SFNewContainerKey = @"SFNewContainerKey";
         NSUInteger newIndex = [newContainer indexOfObject:obj];
         [progressiveArray insertObject:obj atIndex:newIndex];
         
-        [self delegateDidChangeObject:obj atIndex:NSNotFound progressiveChangeIndex:NSNotFound forChangeType:MRTFetchedResultsChangeInsert newIndex:newIndex];
+        [self delegateDidChangeObject:obj atIndex:NSNotFound progressiveIndex:NSNotFound forChangeType:MRTFetchedResultsChangeInsert newIndex:newIndex newProgressiveIndex:newIndex];
     }
     
     // UPDATED OR MOVED
     for (id obj in updatedObjects) {
     
-        NSUInteger index = [oldContainer indexOfObject:obj];
-        NSUInteger newIndex = [newContainer indexOfObject:obj];
+        __block NSUInteger index = [oldContainer indexOfObject:obj];
+        __block NSUInteger newIndex = [newContainer indexOfObject:obj];
+        __block NSUInteger progressiveIndex = [progressiveArray indexOfObject:obj];
+        __block NSUInteger newProgressiveIndex = newIndex;
 
-        NSUInteger progressiveIndex = [progressiveArray indexOfObject:obj];
+        // Offsetting newProgressiveIndex for delegate who want the progressive changes
+        if (wantProgressiveChanges) {
+            NSIndexSet *affectingIndexes = [updatedObjects indexesOfObjectsPassingTest:^BOOL(id  _Nonnull obj, NSUInteger idx, BOOL * _Nonnull stop) {
+                NSUInteger objNewIndex = [newContainer indexOfObject:obj];
+                NSUInteger objOldIndex = [oldContainer indexOfObject:obj];
+                
+                return (objOldIndex < index && objNewIndex > newIndex) && objNewIndex != objOldIndex;
+            }];
+            
+            newProgressiveIndex += affectingIndexes.count;
+        }
         
         // Same index, the object was just updated
-        if ((delegateHas.delegateHasDidChangeObject && index == newIndex) ||
-            (delegateHas.delegateHasDidChangeObjectWithProgressiveChanges && progressiveIndex == newIndex)) {
-            [self delegateDidChangeObject:obj atIndex:index progressiveChangeIndex:progressiveIndex forChangeType:MRTFetchedResultsChangeUpdate newIndex:index];
+        if ((wantProgressiveChanges && progressiveIndex == newProgressiveIndex) ||
+            (!wantProgressiveChanges && index == newIndex)) {
+            [self delegateDidChangeObject:obj atIndex:index progressiveIndex:progressiveIndex forChangeType:MRTFetchedResultsChangeUpdate newIndex:newIndex newProgressiveIndex:newProgressiveIndex];
         }
         
         // Different index, mean that the object was also moved
         else {
-            [self delegateDidChangeObject:obj atIndex:index progressiveChangeIndex:progressiveIndex forChangeType:MRTFetchedResultsChangeMove newIndex:newIndex];
-        
+            [self delegateDidChangeObject:obj atIndex:index progressiveIndex:progressiveIndex forChangeType:MRTFetchedResultsChangeMove newIndex:newIndex newProgressiveIndex:newProgressiveIndex];
+            
             [progressiveArray removeObjectAtIndex:progressiveIndex];
-            [progressiveArray insertObject:obj atIndex:newIndex];
+            [progressiveArray insertObject:obj atIndex:newProgressiveIndex];
         }
     }
 }
