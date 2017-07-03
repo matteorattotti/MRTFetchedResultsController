@@ -407,6 +407,33 @@ const NSString *SFNewContainerKey = @"SFNewContainerKey";
     
     BOOL wantProgressiveChanges = delegateHas.delegateHasDidChangeObjectWithProgressiveChanges;
     
+    /*updatedObjects = [updatedObjects sortedArrayUsingComparator:^NSComparisonResult(id  _Nonnull obj1, id  _Nonnull obj2) {
+        NSInteger obj1OldIndex = [newContainer indexOfObject:obj1];
+        NSInteger obj2OldIndex = [newContainer indexOfObject:obj2];
+        
+        if (obj1OldIndex == obj2OldIndex) { return NSOrderedSame; }
+        if (obj1OldIndex > obj2OldIndex) {return NSOrderedAscending; }
+        return NSOrderedDescending;
+        
+    }];*/
+
+    /*
+    // Sorting the updated objects to notify first the objects that have moved the most
+    updatedObjects = [updatedObjects sortedArrayUsingComparator:^NSComparisonResult(id  _Nonnull obj1, id  _Nonnull obj2) {
+        NSInteger obj1OldIndex = [oldContainer indexOfObject:obj1];
+        NSInteger obj1NewIndex = [newContainer indexOfObject:obj1];
+        NSInteger obj1NumberOfMoves = MAX(obj1OldIndex, obj1NewIndex);
+        
+        NSInteger obj2OldIndex = [oldContainer indexOfObject:obj2];
+        NSInteger obj2NewIndex = [newContainer indexOfObject:obj2];
+        NSInteger obj2NumberOfMoves = MAX(obj2NewIndex, obj2OldIndex);
+        
+        if (obj1NumberOfMoves == obj2NumberOfMoves) { return NSOrderedSame; }
+        if (obj1NumberOfMoves > obj2NumberOfMoves) {return NSOrderedAscending; }
+        return NSOrderedDescending;
+        
+    }];*/
+    
     // DELETED
     for (id obj in deletedObjects) {
         NSUInteger index = [oldContainer indexOfObject:obj];
@@ -425,6 +452,8 @@ const NSString *SFNewContainerKey = @"SFNewContainerKey";
         [self delegateDidChangeObject:obj atIndex:NSNotFound progressiveIndex:NSNotFound forChangeType:MRTFetchedResultsChangeInsert newIndex:newIndex newProgressiveIndex:newIndex];
     }
     
+    NSMutableArray *objectsToMove = [updatedObjects mutableCopy];
+    
     // UPDATED OR MOVED
     for (id obj in updatedObjects) {
     
@@ -433,17 +462,38 @@ const NSString *SFNewContainerKey = @"SFNewContainerKey";
         __block NSUInteger progressiveIndex = [progressiveArray indexOfObject:obj];
         __block NSUInteger newProgressiveIndex = newIndex;
 
+        [objectsToMove removeObject:obj];
+
+        
         // Offsetting newProgressiveIndex for delegate who want the progressive changes
         if (wantProgressiveChanges) {
-            NSIndexSet *affectingIndexes = [updatedObjects indexesOfObjectsPassingTest:^BOOL(id  _Nonnull obj, NSUInteger idx, BOOL * _Nonnull stop) {
-                NSUInteger objNewIndex = [newContainer indexOfObject:obj];
-                NSUInteger objOldIndex = [oldContainer indexOfObject:obj];
+            NSIndexSet *affectingIndexes = [objectsToMove indexesOfObjectsPassingTest:^BOOL(id  _Nonnull otherObj, NSUInteger idx, BOOL * _Nonnull stop) {
+                //NSUInteger objNewIndex = [newContainer indexOfObject:otherObj];
+                NSUInteger objOldIndex = [progressiveArray indexOfObject:otherObj];
                 
-                return (objOldIndex < index && objNewIndex > newIndex) && objNewIndex != objOldIndex;
+                return objOldIndex <= newIndex+1;
             }];
             
             newProgressiveIndex += affectingIndexes.count;
         }
+        /*
+        // Offsetting newProgressiveIndex for delegate who want the progressive changes
+        if (wantProgressiveChanges) {
+            NSIndexSet *affectingIndexes = [updatedObjects indexesOfObjectsPassingTest:^BOOL(id  _Nonnull otherObj, NSUInteger idx, BOOL * _Nonnull stop) {
+                NSUInteger objNewIndex = [newContainer indexOfObject:otherObj];
+                NSUInteger objOldIndex = [progressiveArray indexOfObject:otherObj];
+                
+                return ((objOldIndex < index && objNewIndex > newIndex))
+                && objNewIndex != objOldIndex && otherObj != obj;
+            }];
+            
+            if (newProgressiveIndex != 0) {
+                newProgressiveIndex += affectingIndexes.count;
+            }
+        }*/
+        
+        
+         
         
         // Same index, the object was just updated
         if ((wantProgressiveChanges && progressiveIndex == newProgressiveIndex) ||

@@ -10,6 +10,8 @@
 #import <CoreData/CoreData.h>
 #import "MRTFetchedResultsController.h"
 #import "Note.h"
+#import "MRTTestMoveHelper.h"
+#import "NSArray+Permutation.h"
 
 @interface MRTFetchedResultsControllerProgressiveChangesTests : XCTestCase <MRTFetchedResultsControllerDelegate>
 
@@ -421,6 +423,45 @@
     }];
 }
 
+- (void) testMovesDoubleHop2
+{
+    /*
+     abc -> cba
+     */
+    
+    // Inserting a new object inside the managedObjectContext
+    Note *newObject = [NSEntityDescription insertNewObjectForEntityForName:@"Note" inManagedObjectContext:self.managedObjectContext];
+    newObject.order = @1;
+    newObject.text = @"a";
+    
+    // Inserting a new object inside the managedObjectContext
+    Note *newObject2 = [NSEntityDescription insertNewObjectForEntityForName:@"Note" inManagedObjectContext:self.managedObjectContext];
+    newObject2.order = @2;
+    newObject2.text = @"b";
+    
+    // Inserting a new object inside the managedObjectContext
+    Note *newObject3 = [NSEntityDescription insertNewObjectForEntityForName:@"Note" inManagedObjectContext:self.managedObjectContext];
+    newObject3.order = @3;
+    newObject3.text = @"c";
+    
+    [self.targetArray addObjectsFromArray:@[newObject, newObject2, newObject3]];
+    
+    // Creating the fetchedResultsController
+    MRTFetchedResultsController *fetchedResultsController = [self notesFetchedResultsController];
+    [fetchedResultsController performFetch:nil];
+
+    newObject.order = @2;
+    newObject2.order = @3;
+    newObject3.order = @1;
+    
+    // Waiting for the did change expectation
+    [self waitForExpectationsWithTimeout:self.expectationsDefaultTimeout handler:^(NSError *error) {
+        if(error) XCTFail(@"Expectation Failed with error: %@", error);
+        
+        XCTAssertTrue([fetchedResultsController.arrangedObjects isEqualToArray:self.targetArray]);
+    }];
+}
+
 - (void) testMovesDoubleHopReverse
 {
     /*
@@ -630,15 +671,15 @@
     newObject.order = @1;
     newObject.text = @"a";
     
-    // Inserting a new object inside the managedObjectContext
-    Note *newObject2 = [NSEntityDescription insertNewObjectForEntityForName:@"Note" inManagedObjectContext:self.managedObjectContext];
-    newObject2.order = @10;
-    newObject2.text = @"b";
-    
-    // Inserting a new object inside the managedObjectContext
-    Note *newObject3 = [NSEntityDescription insertNewObjectForEntityForName:@"Note" inManagedObjectContext:self.managedObjectContext];
-    newObject3.order = @100;
-    newObject3.text = @"c";
+//    // Inserting a new object inside the managedObjectContext
+//    Note *newObject2 = [NSEntityDescription insertNewObjectForEntityForName:@"Note" inManagedObjectContext:self.managedObjectContext];
+//    newObject2.order = @10;
+//    newObject2.text = @"b";
+//    
+//    // Inserting a new object inside the managedObjectContext
+//    Note *newObject3 = [NSEntityDescription insertNewObjectForEntityForName:@"Note" inManagedObjectContext:self.managedObjectContext];
+//    newObject3.order = @100;
+//    newObject3.text = @"c";
     
     // Inserting a new object inside the managedObjectContext
     Note *newObject4 = [NSEntityDescription insertNewObjectForEntityForName:@"Note" inManagedObjectContext:self.managedObjectContext];
@@ -656,7 +697,7 @@
     newObject6.order = @100000;
     newObject6.text = @"d";
     
-    [self.targetArray addObjectsFromArray:@[newObject, newObject2, newObject3, newObject4, newObject5, newObject6]];
+    [self.targetArray addObjectsFromArray:@[newObject, /*newObject2, newObject3, */newObject4, newObject5, newObject6]];
     
     [self.managedObjectContext processPendingChanges];
     
@@ -720,6 +761,65 @@
     }];
 }
 
+- (void) testAllMoves
+{
+    [self.didChangeContentExpectation fulfill];
+
+    
+    //NSArray *items = @[@"a", @"b", @"c"];
+    //NSArray *order = @[@1, @2, @3];
+
+    //NSArray *items = @[@"a", @"b", @"c", @"d"];
+    //NSArray *order = @[@1, @2, @3, @4];
+
+    //NSArray *items = @[@"a", @"b", @"c", @"d", @"e"];
+    //NSArray *order = @[@1, @2, @3, @4, @5];
+
+    NSArray *items = @[@"a", @"b", @"c", @"d", @"e", @"f"];
+    NSArray *order = @[@1, @2, @3, @4, @5, @6];
+
+    //NSArray *items = @[@"a", @"b", @"c", @"d", @"e", @"f", @"g"];
+    //NSArray *order = @[@1, @2, @3, @4, @5, @6, @7];
+
+    //NSArray *items = @[@"a", @"b", @"c", @"d", @"e", @"f", @"g", @"h"];
+    //NSArray *order = @[@1, @2, @3, @4, @5, @6, @7, @8];
+
+    
+    NSArray *allOrder = [order allPermutations];
+    
+    NSMutableArray *helpers = [NSMutableArray array];
+    
+    for (NSArray *finalOrder in allOrder) {
+        MRTTestMoveHelper *helper = [[MRTTestMoveHelper alloc] initWithTest:self initialItems:items finalOrders:finalOrder];
+        [helpers addObject:helper];
+    }
+
+    
+    [self waitForExpectationsWithTimeout:2.0 handler:^(NSError *error) {
+        
+        NSUInteger successes = 0;
+        NSUInteger failures = 0;
+
+        for (MRTTestMoveHelper *helper in helpers) {
+        
+            
+            if (![helper isFinalOrderCorrect]) {
+                NSLog(@"Failed %@ \n---------\n%@\n---------\n",helper, helper.movementHistory);
+                failures++;
+                break;
+            }
+            else {
+                //NSLog(@"Success %lu", (unsigned long)helper.numberOfMoves);
+                successes++;
+            }
+        }
+        
+        XCTAssertTrue(failures == 0);
+        
+        NSLog(@"Successes %lu Failures %lu",(unsigned long) successes, (unsigned long)failures);
+        
+    }];
+}
 
 #pragma mark - Multiple changes
 

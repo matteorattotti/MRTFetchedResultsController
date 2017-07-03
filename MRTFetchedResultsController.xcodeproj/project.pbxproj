@@ -13,6 +13,8 @@
 		0C351D0A1B04CF81002AE121 /* TestableEntity.m in Sources */ = {isa = PBXBuildFile; fileRef = 0C351D091B04CF81002AE121 /* TestableEntity.m */; };
 		0C351D481B04E4E8002AE121 /* Note.m in Sources */ = {isa = PBXBuildFile; fileRef = 0C351D471B04E4E8002AE121 /* Note.m */; };
 		0C4980C91DA6561F00DB986D /* MRTFetchedResultsControllerProgressiveChangesTests.m in Sources */ = {isa = PBXBuildFile; fileRef = 0C4980C81DA6561F00DB986D /* MRTFetchedResultsControllerProgressiveChangesTests.m */; };
+		0CBB3BCC1F0651150053B8B9 /* MRTTestMoveHelper.m in Sources */ = {isa = PBXBuildFile; fileRef = 0CBB3BCB1F0651150053B8B9 /* MRTTestMoveHelper.m */; };
+		0CBB3BCF1F0674A70053B8B9 /* NSArray+Permutation.m in Sources */ = {isa = PBXBuildFile; fileRef = 0CBB3BCE1F0674A70053B8B9 /* NSArray+Permutation.m */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -27,6 +29,10 @@
 		0C351D461B04E4E8002AE121 /* Note.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = Note.h; sourceTree = "<group>"; };
 		0C351D471B04E4E8002AE121 /* Note.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = Note.m; sourceTree = "<group>"; };
 		0C4980C81DA6561F00DB986D /* MRTFetchedResultsControllerProgressiveChangesTests.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = MRTFetchedResultsControllerProgressiveChangesTests.m; sourceTree = "<group>"; };
+		0CBB3BCA1F0651150053B8B9 /* MRTTestMoveHelper.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = MRTTestMoveHelper.h; sourceTree = "<group>"; };
+		0CBB3BCB1F0651150053B8B9 /* MRTTestMoveHelper.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = MRTTestMoveHelper.m; sourceTree = "<group>"; };
+		0CBB3BCD1F0674A70053B8B9 /* NSArray+Permutation.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = "NSArray+Permutation.h"; sourceTree = "<group>"; };
+		0CBB3BCE1F0674A70053B8B9 /* NSArray+Permutation.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = "NSArray+Permutation.m"; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -71,6 +77,10 @@
 			children = (
 				0C351CF61B049829002AE121 /* MRTFetchedResultsControllerTests.m */,
 				0C4980C81DA6561F00DB986D /* MRTFetchedResultsControllerProgressiveChangesTests.m */,
+				0CBB3BCA1F0651150053B8B9 /* MRTTestMoveHelper.h */,
+				0CBB3BCB1F0651150053B8B9 /* MRTTestMoveHelper.m */,
+				0CBB3BCD1F0674A70053B8B9 /* NSArray+Permutation.h */,
+				0CBB3BCE1F0674A70053B8B9 /* NSArray+Permutation.m */,
 				0C351CFC1B04AB57002AE121 /* Models */,
 				0C351CF41B049829002AE121 /* Supporting Files */,
 			);
@@ -165,7 +175,9 @@
 				0C4980C91DA6561F00DB986D /* MRTFetchedResultsControllerProgressiveChangesTests.m in Sources */,
 				0C351D481B04E4E8002AE121 /* Note.m in Sources */,
 				0C351CFB1B04982F002AE121 /* MRTFetchedResultsController.m in Sources */,
+				0CBB3BCF1F0674A70053B8B9 /* NSArray+Permutation.m in Sources */,
 				0C351CF71B049829002AE121 /* MRTFetchedResultsControllerTests.m in Sources */,
+				0CBB3BCC1F0651150053B8B9 /* MRTTestMoveHelper.m in Sources */,
 				0C351D0A1B04CF81002AE121 /* TestableEntity.m in Sources */,
 				0C351CFF1B04AB65002AE121 /* Model.xcdatamodeld in Sources */,
 			);
