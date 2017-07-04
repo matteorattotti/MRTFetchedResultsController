@@ -10,28 +10,33 @@
 
 const NSString *SFNewContainerKey = @"SFNewContainerKey";
 
+struct MRTFetchedResultsControllerDelegateHasMethods {
+    BOOL delegateHasWillChangeContent;
+    BOOL delegateHasDidChangeContent;
+    BOOL delegateHasDidChangeObject;
+    BOOL delegateHasDidChangeObjectWithProgressiveChanges;
+};
+
 @interface MRTFetchedResultsController ()
 {
     NSMutableArray *_fetchedObjects;
     NSMutableArray *_arrangedObjects;
-    
-    struct {
-        BOOL delegateHasWillChangeContent;
-        BOOL delegateHasDidChangeContent;
-        BOOL delegateHasDidChangeObject;
-        BOOL delegateHasDidChangeObjectWithProgressiveChanges;
-    } delegateHas;
 }
 
 @property (nonatomic, strong) NSFetchRequest *arrangedObjectInMemoryFetchRequest;
+
+@property (nonatomic, retain) NSManagedObjectContext *managedObjectContext;
+@property (nonatomic, retain) NSFetchRequest *fetchRequest;
+
+@property (nonatomic, retain) NSArray *fetchedObjects;
+@property (nonatomic, retain) NSArray *arrangedObjects;
+
+@property (nonatomic) struct MRTFetchedResultsControllerDelegateHasMethods delegateHas;
 
 @end
 
 
 @implementation MRTFetchedResultsController
-
-@synthesize fetchedObjects  = _fetchedObjects;
-@synthesize arrangedObjects = _arrangedObjects;
 
 #pragma mark - Initialization
 
@@ -47,11 +52,47 @@ const NSString *SFNewContainerKey = @"SFNewContainerKey";
     return self;
 }
 
+#pragma mark - NSCopying
+
+- (id)copyWithZone:(NSZone *)zone
+{
+    typeof(self) copy = [[[self class] alloc] init];
+    
+    copy.delegate = _delegate;
+    copy.delegateHas = _delegateHas;
+
+    copy.managedObjectContext = _managedObjectContext;
+    copy.fetchRequest = [_fetchRequest copy];
+    copy.arrangedObjectInMemoryFetchRequest = [_arrangedObjectInMemoryFetchRequest copy];
+    
+    copy.fetchedObjects = [_fetchedObjects mutableCopy];
+    copy.arrangedObjects = [_arrangedObjects mutableCopy];
+    
+    copy.filterPredicate = [self.filterPredicate copy];
+    copy.sortDescriptors = [self.sortDescriptors copy];
+    
+    [copy setupMocObserver];
+
+    return copy;
+}
+
 #pragma mark - Dealloc
 
 - (void)dealloc
 {
     [[NSNotificationCenter defaultCenter] removeObserver:self];
+}
+
+#pragma mark - Moc Observation
+
+- (void) setupMocObserver
+{
+    // Processing changes to avoid notification about objects we alrady have
+    [self.managedObjectContext processPendingChanges];
+    [[NSNotificationCenter defaultCenter] addObserver:self
+                                             selector:@selector(managedObjectContextObjectsDidChange:)
+                                                 name:NSManagedObjectContextObjectsDidChangeNotification
+                                               object:_managedObjectContext];
 }
 
 #pragma mark - Fetched Objects
@@ -67,14 +108,11 @@ const NSString *SFNewContainerKey = @"SFNewContainerKey";
     BOOL success = (_fetchedObjects != nil);
     
     if (success) {
+        // Arranging objects
         [self updateArrangedObjects];
-        
-        // Processing changes to avoid notification about objects we alrady have
-        [self.managedObjectContext processPendingChanges];
-        [[NSNotificationCenter defaultCenter] addObserver:self
-                                                 selector:@selector(managedObjectContextObjectsDidChange:)
-                                                     name:NSManagedObjectContextObjectsDidChangeNotification
-                                                   object:_managedObjectContext];
+
+        // Setting us as observer of the managed object context
+        [self setupMocObserver];
     }
     
     return success;
@@ -105,10 +143,10 @@ const NSString *SFNewContainerKey = @"SFNewContainerKey";
 - (void)setDelegate:(id<MRTFetchedResultsControllerDelegate>)delegate
 {
     _delegate = delegate;
-    delegateHas.delegateHasWillChangeContent = [_delegate respondsToSelector:@selector(controllerWillChangeContent:)];
-    delegateHas.delegateHasDidChangeContent  = [_delegate respondsToSelector:@selector(controllerDidChangeContent:)];
-    delegateHas.delegateHasDidChangeObject   = [_delegate respondsToSelector:@selector(controller:didChangeObject:atIndex:forChangeType:newIndex:)];
-    delegateHas.delegateHasDidChangeObjectWithProgressiveChanges = [_delegate respondsToSelector:@selector(controller:didChangeObject:atIndex:progressiveIndex:forChangeType:newIndex:newProgressiveIndex:)];
+    _delegateHas.delegateHasWillChangeContent = [_delegate respondsToSelector:@selector(controllerWillChangeContent:)];
+    _delegateHas.delegateHasDidChangeContent  = [_delegate respondsToSelector:@selector(controllerDidChangeContent:)];
+    _delegateHas.delegateHasDidChangeObject   = [_delegate respondsToSelector:@selector(controller:didChangeObject:atIndex:forChangeType:newIndex:)];
+    _delegateHas.delegateHasDidChangeObjectWithProgressiveChanges = [_delegate respondsToSelector:@selector(controller:didChangeObject:atIndex:progressiveIndex:forChangeType:newIndex:newProgressiveIndex:)];
 }
 
 - (void)setSortDescriptors:(NSArray *)sortDescriptors
@@ -372,14 +410,14 @@ const NSString *SFNewContainerKey = @"SFNewContainerKey";
 
 - (void)delegateWillChangeContent
 {
-    if (delegateHas.delegateHasWillChangeContent) {
+    if (self.delegateHas.delegateHasWillChangeContent) {
         [self.delegate controllerWillChangeContent:self];
     }
 }
 
 - (void)delegateDidChangeContent
 {
-    if (delegateHas.delegateHasDidChangeContent) {
+    if (self.delegateHas.delegateHasDidChangeContent) {
         [self.delegate controllerDidChangeContent:self];
     }
 }
@@ -388,10 +426,10 @@ const NSString *SFNewContainerKey = @"SFNewContainerKey";
 {
     // NSLog(@"Changing object: %@\nAt index: %lu\nChange type: %d\nNew index: %lu", anObject, index, (int)type, newIndex);
     
-    if (delegateHas.delegateHasDidChangeObjectWithProgressiveChanges) {
+    if (self.delegateHas.delegateHasDidChangeObjectWithProgressiveChanges) {
         [self.delegate controller:self didChangeObject:anObject atIndex:index progressiveIndex:progressiveIndex forChangeType:type newIndex:newIndex newProgressiveIndex:newProgressiveIndex];
     }
-    else if (delegateHas.delegateHasDidChangeObject) {
+    else if (self.delegateHas.delegateHasDidChangeObject) {
         [self.delegate controller:self didChangeObject:anObject atIndex:index forChangeType:type newIndex:newIndex];
     }
 }
@@ -405,7 +443,7 @@ const NSString *SFNewContainerKey = @"SFNewContainerKey";
     // Tmp array used to keep track of middle states
     NSMutableArray *progressiveArray = [oldContainer mutableCopy];
     
-    BOOL wantProgressiveChanges = delegateHas.delegateHasDidChangeObjectWithProgressiveChanges;
+    BOOL wantProgressiveChanges = self.delegateHas.delegateHasDidChangeObjectWithProgressiveChanges;
     
     // DELETED
     for (id obj in deletedObjects) {

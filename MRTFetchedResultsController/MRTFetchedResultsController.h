@@ -19,7 +19,7 @@ typedef NSUInteger MRTFetchedResultsChangeType;
 
 @protocol MRTFetchedResultsControllerDelegate;
 
-@interface MRTFetchedResultsController : NSObject
+@interface MRTFetchedResultsController : NSObject <NSCopying>
 
 @property (nonatomic, assign) id<MRTFetchedResultsControllerDelegate> delegate;
 

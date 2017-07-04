@@ -1114,6 +1114,41 @@
     }];
 }
 
+#pragma mark - Deep copy
+
+- (void) testCopy
+{
+    // Inserting a new object inside the managedObjectContext
+    Note *newObject = [NSEntityDescription insertNewObjectForEntityForName:@"Note" inManagedObjectContext:self.managedObjectContext];
+    newObject.order = @1;
+    
+    Note *newObject2 = [NSEntityDescription insertNewObjectForEntityForName:@"Note" inManagedObjectContext:self.managedObjectContext];
+    newObject2.order = @2;
+    
+    // Creating the fetchedResultsController
+    MRTFetchedResultsController *fetchedResultsController = [self notesFetchedResultsController];
+    [fetchedResultsController performFetch:nil];
+
+    MRTFetchedResultsController *copyFetchedResultsController = [fetchedResultsController copy];
+    
+    // Changing order
+    newObject2.order = @0;
+    
+    // Creating a new expectation
+    XCTestExpectation *expectation = [self expectationWithDescription:@"Move of object notified"];
+    expectation.expectedFulfillmentCount = 2;
+    newObject2.moveExpectation = expectation;
+    
+    // Waiting for all expectations
+    [self waitForExpectationsWithTimeout:self.expectationsDefaultTimeout handler:^(NSError *error) {
+        if(error) XCTFail(@"Expectation Failed with error: %@", error);
+        
+        XCTAssertTrue([fetchedResultsController.arrangedObjects isEqualToArray:copyFetchedResultsController.arrangedObjects]);
+        
+    }];
+}
+
+
 #pragma mark - MRTFetchedResultsController utils
 
 - (MRTFetchedResultsController *) notesFetchedResultsController
