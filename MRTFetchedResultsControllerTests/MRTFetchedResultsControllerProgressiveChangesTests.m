@@ -795,7 +795,7 @@
     }
 
     
-    [self waitForExpectationsWithTimeout:2.0 handler:^(NSError *error) {
+    [self waitForExpectationsWithTimeout:1.0 handler:^(NSError *error) {
         
         NSUInteger successes = 0;
         NSUInteger failures = 0;
