@@ -463,9 +463,10 @@ struct MRTFetchedResultsControllerDelegateHasMethods {
         [self delegateDidChangeObject:obj atIndex:NSNotFound progressiveIndex:NSNotFound forChangeType:MRTFetchedResultsChangeInsert newIndex:newIndex newProgressiveIndex:newIndex];
     }
     
-    NSMutableArray *objectsToMove = [updatedObjects mutableCopy];
-    
     // UPDATED OR MOVED
+    NSInteger previousSegmentLocation = -1;
+    NSInteger previousInsert = -1;
+
     for (id obj in updatedObjects) {
     
         __block NSUInteger index = [oldContainer indexOfObject:obj];
@@ -473,29 +474,50 @@ struct MRTFetchedResultsControllerDelegateHasMethods {
         __block NSUInteger progressiveIndex = [progressiveArray indexOfObject:obj];
         __block NSUInteger newProgressiveIndex = newIndex;
 
-        [objectsToMove removeObject:obj];
-        
         // Offsetting newProgressiveIndex for delegate who want the progressive changes
         if (wantProgressiveChanges) {
-            NSIndexSet *affectingIndexes = [objectsToMove indexesOfObjectsPassingTest:^BOOL(id  _Nonnull otherObj, NSUInteger idx, BOOL * _Nonnull stop) {
-                NSUInteger otherObjCurrenIndex = [progressiveArray indexOfObject:otherObj];
-                
-                return otherObjCurrenIndex <= newIndex + 1;
-            }];
+            // First object and it's moving to the top if the array, no offset needed
+            if (previousSegmentLocation == -1 && newIndex == 0) {
+            }
+            // This object is adjacent to the previous one inserted, we can just add 1 to the index
+            else if (previousSegmentLocation == newIndex -1) {
+                newProgressiveIndex = previousInsert +1;
+            }
+            // Found a gap, finding the previous object in the final array and inserting next to it to pass the gap
+            else {
+                newProgressiveIndex = [progressiveArray indexOfObject:[newContainer objectAtIndex:newIndex-1]] +1;
+            }
             
-            newProgressiveIndex += affectingIndexes.count;
+            // Removing element from the top and moving it to the bottom requires adjusting the index by 1
+            if (newProgressiveIndex > progressiveIndex) {
+                newProgressiveIndex--;
+            }
+
+            previousSegmentLocation = newIndex;
+            previousInsert = newProgressiveIndex;
         }
-        
         
         // Same index, the object was just updated
         if ((wantProgressiveChanges && progressiveIndex == newProgressiveIndex) ||
-            (!wantProgressiveChanges && index == newIndex)) {
-            [self delegateDidChangeObject:obj atIndex:index progressiveIndex:progressiveIndex forChangeType:MRTFetchedResultsChangeUpdate newIndex:newIndex newProgressiveIndex:newProgressiveIndex];
+            (!wantProgressiveChanges && index == newIndex))
+        {
+            [self delegateDidChangeObject:obj
+                                  atIndex:index
+                         progressiveIndex:progressiveIndex
+                            forChangeType:MRTFetchedResultsChangeUpdate
+                                 newIndex:newIndex
+                      newProgressiveIndex:newProgressiveIndex];
         }
         
         // Different index, mean that the object was also moved
-        else {
-            [self delegateDidChangeObject:obj atIndex:index progressiveIndex:progressiveIndex forChangeType:MRTFetchedResultsChangeMove newIndex:newIndex newProgressiveIndex:newProgressiveIndex];
+        else
+        {
+            [self delegateDidChangeObject:obj
+                                  atIndex:index
+                         progressiveIndex:progressiveIndex
+                            forChangeType:MRTFetchedResultsChangeMove
+                                 newIndex:newIndex
+                      newProgressiveIndex:newProgressiveIndex];
             
             [progressiveArray removeObjectAtIndex:progressiveIndex];
             [progressiveArray insertObject:obj atIndex:newProgressiveIndex];

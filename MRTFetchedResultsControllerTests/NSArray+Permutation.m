@@ -8,7 +8,7 @@
 
 #import "NSArray+Permutation.h"
 
-#define MAX_PERMUTATION_COUNT   20000
+#define MAX_PERMUTATION_COUNT   200000
 
 NSInteger *pc_next_permutation(NSInteger *perm, const NSInteger size);
 NSInteger *pc_next_permutation(NSInteger *perm, const NSInteger size)

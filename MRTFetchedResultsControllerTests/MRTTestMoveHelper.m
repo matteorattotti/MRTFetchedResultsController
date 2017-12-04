@@ -64,6 +64,11 @@
     
     // Changing the item to trigger a reorder the items
     [finalOrders enumerateObjectsUsingBlock:^(NSNumber *order, NSUInteger idx, BOOL * _Nonnull stop) {
+        /*if (idx > self.targetArray.count) {
+            *stop = YES;
+            return;
+        }*/
+        
         Note *note = [self.targetArray objectAtIndex:idx];
         
         if (![note.order isEqualToNumber:order]) {

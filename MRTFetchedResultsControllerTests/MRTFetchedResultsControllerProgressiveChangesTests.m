@@ -12,6 +12,7 @@
 #import "Note.h"
 #import "MRTTestMoveHelper.h"
 #import "NSArray+Permutation.h"
+#import "NSSet+Combinatorics.h"
 
 @interface MRTFetchedResultsControllerProgressiveChangesTests : XCTestCase <MRTFetchedResultsControllerDelegate>
 
@@ -761,41 +762,86 @@
     }];
 }
 
+- (void) testManyMoves6
+{
+    /*
+     abc -> cba
+     */
+
+    // Inserting a new object inside the managedObjectContext
+    Note *newObject = [NSEntityDescription insertNewObjectForEntityForName:@"Note" inManagedObjectContext:self.managedObjectContext];
+    newObject.text = @"a";
+    newObject.order = @1;
+    
+    // Inserting a new object inside the managedObjectContext
+    Note *newObject2 = [NSEntityDescription insertNewObjectForEntityForName:@"Note" inManagedObjectContext:self.managedObjectContext];
+    newObject2.text = @"b";
+    newObject2.order = @2;
+    
+    // Inserting a new object inside the managedObjectContext
+    Note *newObject3 = [NSEntityDescription insertNewObjectForEntityForName:@"Note" inManagedObjectContext:self.managedObjectContext];
+    newObject3.text = @"c";
+    newObject3.order = @3;
+    
+    [self.targetArray addObjectsFromArray:@[newObject, newObject2, newObject3]];    
+    
+    // Creating the fetchedResultsController
+    MRTFetchedResultsController *fetchedResultsController = [self notesFetchedResultsController];
+    [fetchedResultsController performFetch:nil];
+    
+    newObject2.order = @(-1);
+    newObject3.order = @(-2);
+    
+    // Waiting for the did change expectation
+    [self waitForExpectationsWithTimeout:self.expectationsDefaultTimeout handler:^(NSError *error) {
+        if(error) XCTFail(@"Expectation Failed with error: %@", error);
+        
+        XCTAssertTrue([fetchedResultsController.arrangedObjects isEqualToArray:self.targetArray]);
+    }];
+}
+
 - (void) testAllMoves
 {
     [self.didChangeContentExpectation fulfill];
 
     
     //NSArray *items = @[@"a", @"b", @"c"];
-    //NSArray *order = @[@1, @2, @3];
+    //NSArray *order = @[@(0), @(1), @(2), @(3), @(-1), @(-2), @(-3)];
 
     //NSArray *items = @[@"a", @"b", @"c", @"d"];
-    //NSArray *order = @[@1, @2, @3, @4];
+    //NSArray *order = @[@(0), @(1), @(2), @(3), @(-1), @(-2), @(-3), @(-4)];
 
     //NSArray *items = @[@"a", @"b", @"c", @"d", @"e"];
-    //NSArray *order = @[@1, @2, @3, @4, @5];
+    //NSArray *order = @[@(0), @(1), @(2), @(3), @(4), @(-1), @(-2), @(-3), @(-4), @(-5)];
 
     NSArray *items = @[@"a", @"b", @"c", @"d", @"e", @"f"];
     NSArray *order = @[@1, @2, @3, @4, @5, @6];
 
     //NSArray *items = @[@"a", @"b", @"c", @"d", @"e", @"f", @"g"];
-    //NSArray *order = @[@1, @2, @3, @4, @5, @6, @7];
+    //NSArray *order = @[@0, @1, @2, @3, @4, @5, @6];
 
     //NSArray *items = @[@"a", @"b", @"c", @"d", @"e", @"f", @"g", @"h"];
     //NSArray *order = @[@1, @2, @3, @4, @5, @6, @7, @8];
 
-    
-    NSArray *allOrder = [order allPermutations];
-    
+//    NSMutableArray *helpers = [NSMutableArray array];
+//    MRTTestMoveHelper *helper = [[MRTTestMoveHelper alloc] initWithTest:self initialItems:items finalOrders:@[@3, @6, @2, @4, @5, @1]];
+//    [helpers addObject:helper];
+
+    NSSet *allOrderSet = [NSSet setWithArray:order];
+    allOrderSet = [allOrderSet variationsOfSize:items.count];
+        
     NSMutableArray *helpers = [NSMutableArray array];
     
-    for (NSArray *finalOrder in allOrder) {
+    for (NSArray *finalOrder in allOrderSet) {
+        if ([[finalOrder subarrayWithRange:NSMakeRange(0, items.count)] isEqualToArray:[order subarrayWithRange:NSMakeRange(0, items.count)]]) {
+            continue;
+        }
         MRTTestMoveHelper *helper = [[MRTTestMoveHelper alloc] initWithTest:self initialItems:items finalOrders:finalOrder];
         [helpers addObject:helper];
     }
 
     
-    [self waitForExpectationsWithTimeout:1.0 handler:^(NSError *error) {
+    [self waitForExpectationsWithTimeout:1 handler:^(NSError *error) {
         
         NSUInteger successes = 0;
         NSUInteger failures = 0;
@@ -806,7 +852,7 @@
             if (![helper isFinalOrderCorrect]) {
                 NSLog(@"Failed %@ \n---------\n%@\n---------\n",helper, helper.movementHistory);
                 failures++;
-                break;
+                //break;
             }
             else {
                 //NSLog(@"Success %lu", (unsigned long)helper.numberOfMoves);
