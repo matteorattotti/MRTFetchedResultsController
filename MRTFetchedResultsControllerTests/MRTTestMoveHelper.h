@@ -22,6 +22,8 @@
 
 @property (strong) NSMutableArray *targetArray;
 
+@property (strong) NSArray *finalOrders;
+
 @property (strong) XCTestExpectation *didChangeContentExpectation;
 
 @property (strong) MRTFetchedResultsController *fetchedResultsController;
@@ -30,6 +32,10 @@
 
 @property (nonatomic) NSUInteger numberOfMoves;
 
+@property (nonatomic) BOOL logMoves;
+
+
+- (void) performMoves;
 
 - (BOOL) isFinalOrderCorrect;
 

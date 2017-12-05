@@ -20,9 +20,10 @@
         
         self.movementHistory = [NSMutableString string];
         
+        self.finalOrders = finalOrders;
         self.didChangeContentExpectation = [testCase expectationWithDescription:@"Controller Did Change Content"];
 
-        [self prepareItems:initialItems finalOrders:finalOrders];
+        [self prepareItems:initialItems];
     }
     return self;
 }
@@ -41,7 +42,7 @@
     self.managedObjectContext.persistentStoreCoordinator = coordinator;
 }
 
-- (void) prepareItems: (NSArray *) items finalOrders:(NSArray *) finalOrders
+- (void) prepareItems: (NSArray *) items
 {
     self.targetArray = [NSMutableArray array];
     
@@ -61,14 +62,21 @@
     // Creating the fetchedResultsController and fetching
     self.fetchedResultsController = [self notesFetchedResultsController];
     [self.fetchedResultsController performFetch:nil];
-    
-    // Changing the item to trigger a reorder the items
-    [finalOrders enumerateObjectsUsingBlock:^(NSNumber *order, NSUInteger idx, BOOL * _Nonnull stop) {
-        /*if (idx > self.targetArray.count) {
-            *stop = YES;
-            return;
-        }*/
+ 
+    [self.finalOrders enumerateObjectsUsingBlock:^(NSNumber *order, NSUInteger idx, BOOL * _Nonnull stop) {
+        Note *note = [self.targetArray objectAtIndex:idx];
         
+        if (![note.order isEqualToNumber:order]) {
+            note.order = order;
+        }
+    }];
+
+}
+
+- (void) performMoves
+{
+    // Changing the item to trigger a reorder the items
+    [self.finalOrders enumerateObjectsUsingBlock:^(NSNumber *order, NSUInteger idx, BOOL * _Nonnull stop) {
         Note *note = [self.targetArray objectAtIndex:idx];
         
         if (![note.order isEqualToNumber:order]) {
@@ -96,29 +104,41 @@
 
 - (void)controller:(MRTFetchedResultsController *)controller didChangeObject:(id)anObject atIndex:(NSUInteger)index progressiveIndex:(NSUInteger) progressiveIndex forChangeType:(MRTFetchedResultsChangeType)type newIndex:(NSUInteger)newIndex newProgressiveIndex:(NSUInteger)newProgressiveIndex;
 {
-    switch (type) {
-        case MRTFetchedResultsChangeDelete:
-            [self.movementHistory appendFormat:@"deleted %@ at %lu\n", [anObject text], progressiveIndex];
-            [self.targetArray removeObjectAtIndex:progressiveIndex];
-            break;
-        case MRTFetchedResultsChangeInsert:
-            [self.movementHistory appendFormat:@"inserted %@ at %lu\n", [anObject text], newProgressiveIndex];
-            [self.targetArray insertObject:anObject atIndex:newProgressiveIndex];
-            break;
-        case MRTFetchedResultsChangeUpdate:
-            [self.movementHistory appendFormat:@"update %@ at %lu\n", [anObject text], progressiveIndex];
-            break;
-        case MRTFetchedResultsChangeMove:
-            self.numberOfMoves++;
-            [self.movementHistory appendFormat:@"move %@ from %lu in %lu\n", [anObject text], (unsigned long)progressiveIndex, (unsigned long)newProgressiveIndex];
-
-            [self.targetArray removeObjectAtIndex:progressiveIndex];
-            [self.targetArray insertObject:anObject atIndex:newProgressiveIndex];
-            
-            [self.movementHistory appendFormat:@"target %@\n", self.targetArray];
-            break;
-        default:
-            break;
+    if (self.logMoves) {
+        switch (type) {
+            case MRTFetchedResultsChangeDelete:
+                [self.movementHistory appendFormat:@"deleted %@ at %lu\n", [anObject text], progressiveIndex];
+                [self.targetArray removeObjectAtIndex:progressiveIndex];
+                break;
+            case MRTFetchedResultsChangeInsert:
+                [self.movementHistory appendFormat:@"inserted %@ at %lu\n", [anObject text], newProgressiveIndex];
+                [self.targetArray insertObject:anObject atIndex:newProgressiveIndex];
+                break;
+            case MRTFetchedResultsChangeUpdate:
+                [self.movementHistory appendFormat:@"update %@ at %lu\n", [anObject text], progressiveIndex];
+                break;
+            case MRTFetchedResultsChangeMove:
+                self.numberOfMoves++;
+                [self.movementHistory appendFormat:@"move %@ from %lu in %lu\n", [anObject text], (unsigned long)progressiveIndex, (unsigned long)newProgressiveIndex];
+                
+                [self.targetArray removeObjectAtIndex:progressiveIndex];
+                [self.targetArray insertObject:anObject atIndex:newProgressiveIndex];
+                
+                [self.movementHistory appendFormat:@"target %@\n", self.targetArray];
+                break;
+            default:
+                break;
+        }
+    }
+    else {
+        switch (type) {
+            case MRTFetchedResultsChangeMove:
+                self.numberOfMoves++;
+                [self.targetArray removeObjectAtIndex:progressiveIndex];
+                [self.targetArray insertObject:anObject atIndex:newProgressiveIndex];
+            default:
+                break;
+        }
     }
 }
 

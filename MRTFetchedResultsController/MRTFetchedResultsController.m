@@ -447,8 +447,8 @@ struct MRTFetchedResultsControllerDelegateHasMethods {
     
     // DELETED
     for (id obj in deletedObjects) {
-        NSUInteger index = [oldContainer indexOfObject:obj];
-        NSUInteger progressiveIndex = [progressiveArray indexOfObject:obj];
+        NSUInteger index = [oldContainer indexOfObjectIdenticalTo:obj];
+        NSUInteger progressiveIndex = [progressiveArray indexOfObjectIdenticalTo:obj];
         
         [progressiveArray removeObjectAtIndex:progressiveIndex];
         
@@ -457,7 +457,7 @@ struct MRTFetchedResultsControllerDelegateHasMethods {
     
     // INSERTED
     for (id obj in insertedObjects) {
-        NSUInteger newIndex = [newContainer indexOfObject:obj];
+        NSUInteger newIndex = [newContainer indexOfObjectIdenticalTo:obj];
         [progressiveArray insertObject:obj atIndex:newIndex];
         
         [self delegateDidChangeObject:obj atIndex:NSNotFound progressiveIndex:NSNotFound forChangeType:MRTFetchedResultsChangeInsert newIndex:newIndex newProgressiveIndex:newIndex];
@@ -469,9 +469,9 @@ struct MRTFetchedResultsControllerDelegateHasMethods {
 
     for (id obj in updatedObjects) {
     
-        __block NSUInteger index = [oldContainer indexOfObject:obj];
-        __block NSUInteger newIndex = [newContainer indexOfObject:obj];
-        __block NSUInteger progressiveIndex = [progressiveArray indexOfObject:obj];
+        __block NSUInteger index = [oldContainer indexOfObjectIdenticalTo:obj];
+        __block NSUInteger newIndex = [newContainer indexOfObjectIdenticalTo:obj];
+        __block NSUInteger progressiveIndex = [progressiveArray indexOfObjectIdenticalTo:obj];
         __block NSUInteger newProgressiveIndex = newIndex;
 
         // Offsetting newProgressiveIndex for delegate who want the progressive changes
@@ -485,7 +485,7 @@ struct MRTFetchedResultsControllerDelegateHasMethods {
             }
             // Found a gap, finding the previous object in the final array and inserting next to it to pass the gap
             else {
-                newProgressiveIndex = [progressiveArray indexOfObject:[newContainer objectAtIndex:newIndex-1]] +1;
+                newProgressiveIndex = [progressiveArray indexOfObjectIdenticalTo:[newContainer objectAtIndex:newIndex-1]] +1;
             }
             
             // Removing element from the top and moving it to the bottom requires adjusting the index by 1
