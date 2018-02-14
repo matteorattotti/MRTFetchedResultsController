@@ -67,16 +67,19 @@ typedef NSUInteger MRTFetchedResultsChangeType;
 
 @protocol MRTFetchedResultsControllerDelegate <NSObject>
 @optional
+
 /**
  Called right before the controller is about to make one or more changes to the content array
  @param controller The fetched results controller
  */
 - (void)controllerWillChangeContent:(MRTFetchedResultsController *)controller;
+
 /**
  Called right after the controller has made one or more changes to the content array
  @param controller The fetched results controller
  */
 - (void)controllerDidChangeContent:(MRTFetchedResultsController *)controller;
+
 /**
  Called for each change that is made to the content array. This method will be called multiple times throughout the change processing.
  @param controller The fetched results controller
@@ -85,7 +88,11 @@ typedef NSUInteger MRTFetchedResultsChangeType;
  @param type The type of change (update, insert, delete, or move)
  @param newIndex The new index of the object. If the object was deleted, the newIndex will be NSNotFound.
  */
-- (void)controller:(MRTFetchedResultsController *)controller didChangeObject:(id)anObject atIndex:(NSUInteger)index forChangeType:(MRTFetchedResultsChangeType)type newIndex:(NSUInteger)newIndex;
+- (void)controller:(MRTFetchedResultsController *)controller
+   didChangeObject:(id)anObject
+           atIndex:(NSUInteger)index
+     forChangeType:(MRTFetchedResultsChangeType)type
+          newIndex:(NSUInteger)newIndex;
 
 /**
  Called for each change that is made to the content array. This method will be called multiple times throughout the change processing.
@@ -98,6 +105,13 @@ typedef NSUInteger MRTFetchedResultsChangeType;
  @param newIndex The new index of the object. If the object was deleted, the newIndex will be NSNotFound.
  @param newProgressiveIndex new index of the object keeping in consideration the previous change in the same batch.
  */
-- (void)controller:(MRTFetchedResultsController *)controller didChangeObject:(id)anObject atIndex:(NSUInteger)index progressiveIndex:(NSUInteger) progressiveIndex forChangeType:(MRTFetchedResultsChangeType)type newIndex:(NSUInteger)newIndex newProgressiveIndex:(NSUInteger) newProgressiveIndex;
+- (void)controller:(MRTFetchedResultsController *)controller
+   didChangeObject:(id)anObject
+           atIndex:(NSUInteger)index
+  progressiveIndex:(NSUInteger) progressiveIndex
+     forChangeType:(MRTFetchedResultsChangeType)changeType
+forProgressiveChangeType:(MRTFetchedResultsChangeType)progressiveChangeType
+          newIndex:(NSUInteger)newIndex
+newProgressiveIndex:(NSUInteger) newProgressiveIndex;
 
 @end

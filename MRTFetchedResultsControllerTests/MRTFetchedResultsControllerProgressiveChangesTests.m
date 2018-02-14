@@ -999,9 +999,16 @@
 }
 
 
-- (void)controller:(MRTFetchedResultsController *)controller didChangeObject:(id)anObject atIndex:(NSUInteger)index progressiveIndex:(NSUInteger) progressiveIndex forChangeType:(MRTFetchedResultsChangeType)type newIndex:(NSUInteger)newIndex newProgressiveIndex:(NSUInteger)newProgressiveIndex;
+- (void)controller:(MRTFetchedResultsController *)controller
+   didChangeObject:(id)anObject
+           atIndex:(NSUInteger)index
+  progressiveIndex:(NSUInteger) progressiveIndex
+     forChangeType:(MRTFetchedResultsChangeType)changeType
+forProgressiveChangeType:(MRTFetchedResultsChangeType)progressiveChangeType
+          newIndex:(NSUInteger)newIndex
+newProgressiveIndex:(NSUInteger) newProgressiveIndex;
 {
-    switch (type) {
+    switch (progressiveChangeType) {
         case MRTFetchedResultsChangeDelete:
             NSLog(@"deleted %@ at %lu", [anObject text], progressiveIndex);
             [self.targetArray removeObjectAtIndex:progressiveIndex];

@@ -146,7 +146,7 @@ struct MRTFetchedResultsControllerDelegateHasMethods {
     _delegateHas.delegateHasWillChangeContent = [_delegate respondsToSelector:@selector(controllerWillChangeContent:)];
     _delegateHas.delegateHasDidChangeContent  = [_delegate respondsToSelector:@selector(controllerDidChangeContent:)];
     _delegateHas.delegateHasDidChangeObject   = [_delegate respondsToSelector:@selector(controller:didChangeObject:atIndex:forChangeType:newIndex:)];
-    _delegateHas.delegateHasDidChangeObjectWithProgressiveChanges = [_delegate respondsToSelector:@selector(controller:didChangeObject:atIndex:progressiveIndex:forChangeType:newIndex:newProgressiveIndex:)];
+    _delegateHas.delegateHasDidChangeObjectWithProgressiveChanges = [_delegate respondsToSelector:@selector(controller:didChangeObject:atIndex:progressiveIndex:forChangeType:forProgressiveChangeType:newIndex:newProgressiveIndex:)];
 }
 
 - (void)setSortDescriptors:(NSArray *)sortDescriptors
@@ -422,15 +422,28 @@ struct MRTFetchedResultsControllerDelegateHasMethods {
     }
 }
 
-- (void)delegateDidChangeObject:(id)anObject atIndex:(NSUInteger)index progressiveIndex:(NSUInteger) progressiveIndex forChangeType:(MRTFetchedResultsChangeType)type newIndex:(NSUInteger)newIndex newProgressiveIndex:(NSUInteger) newProgressiveIndex
+- (void)delegateDidChangeObject:(id)anObject
+                        atIndex:(NSUInteger)index
+               progressiveIndex:(NSUInteger)progressiveIndex
+                     changeType:(MRTFetchedResultsChangeType)changeType
+          progressiveChangeType:(MRTFetchedResultsChangeType)progressiveChangeType
+                       newIndex:(NSUInteger)newIndex
+            newProgressiveIndex:(NSUInteger)newProgressiveIndex
 {
     // NSLog(@"Changing object: %@\nAt index: %lu\nChange type: %d\nNew index: %lu", anObject, index, (int)type, newIndex);
     
     if (self.delegateHas.delegateHasDidChangeObjectWithProgressiveChanges) {
-        [self.delegate controller:self didChangeObject:anObject atIndex:index progressiveIndex:progressiveIndex forChangeType:type newIndex:newIndex newProgressiveIndex:newProgressiveIndex];
+        [self.delegate controller:self
+                  didChangeObject:anObject
+                          atIndex:index
+                 progressiveIndex:progressiveIndex
+                    forChangeType:changeType
+         forProgressiveChangeType:progressiveChangeType
+                         newIndex:newIndex
+              newProgressiveIndex:newProgressiveIndex];
     }
     else if (self.delegateHas.delegateHasDidChangeObject) {
-        [self.delegate controller:self didChangeObject:anObject atIndex:index forChangeType:type newIndex:newIndex];
+        [self.delegate controller:self didChangeObject:anObject atIndex:index forChangeType:changeType newIndex:newIndex];
     }
 }
 
@@ -452,7 +465,14 @@ struct MRTFetchedResultsControllerDelegateHasMethods {
         
         [progressiveArray removeObjectAtIndex:progressiveIndex];
         
-        [self delegateDidChangeObject:obj atIndex:index progressiveIndex:progressiveIndex forChangeType:MRTFetchedResultsChangeDelete newIndex:NSNotFound newProgressiveIndex:NSNotFound];
+        [self delegateDidChangeObject:obj
+                              atIndex:index
+                     progressiveIndex:progressiveIndex
+                           changeType:MRTFetchedResultsChangeDelete
+                progressiveChangeType:MRTFetchedResultsChangeDelete
+                             newIndex:NSNotFound
+                  newProgressiveIndex:NSNotFound];
+
     }
     
     // INSERTED
@@ -460,7 +480,14 @@ struct MRTFetchedResultsControllerDelegateHasMethods {
         NSUInteger newIndex = [newContainer indexOfObjectIdenticalTo:obj];
         [progressiveArray insertObject:obj atIndex:newIndex];
         
-        [self delegateDidChangeObject:obj atIndex:NSNotFound progressiveIndex:NSNotFound forChangeType:MRTFetchedResultsChangeInsert newIndex:newIndex newProgressiveIndex:newIndex];
+        [self delegateDidChangeObject:obj
+                              atIndex:NSNotFound
+                     progressiveIndex:NSNotFound
+                           changeType:MRTFetchedResultsChangeInsert
+                progressiveChangeType:MRTFetchedResultsChangeInsert
+                             newIndex:newIndex
+                  newProgressiveIndex:newIndex];
+
     }
     
     // UPDATED OR MOVED
@@ -497,28 +524,19 @@ struct MRTFetchedResultsControllerDelegateHasMethods {
             previousInsert = newProgressiveIndex;
         }
         
-        // Same index, the object was just updated
-        if ((wantProgressiveChanges && progressiveIndex == newProgressiveIndex) ||
-            (!wantProgressiveChanges && index == newIndex))
-        {
-            [self delegateDidChangeObject:obj
-                                  atIndex:index
-                         progressiveIndex:progressiveIndex
-                            forChangeType:MRTFetchedResultsChangeUpdate
-                                 newIndex:newIndex
-                      newProgressiveIndex:newProgressiveIndex];
-        }
+        // Checking if the change is an update or a move
+        MRTFetchedResultsChangeType changeType = (index == newIndex) ? MRTFetchedResultsChangeUpdate : MRTFetchedResultsChangeMove;
+        MRTFetchedResultsChangeType progressiveChangeType = (progressiveIndex == newProgressiveIndex) ? MRTFetchedResultsChangeUpdate : MRTFetchedResultsChangeMove;
         
-        // Different index, mean that the object was also moved
-        else
-        {
-            [self delegateDidChangeObject:obj
-                                  atIndex:index
-                         progressiveIndex:progressiveIndex
-                            forChangeType:MRTFetchedResultsChangeMove
-                                 newIndex:newIndex
-                      newProgressiveIndex:newProgressiveIndex];
-            
+        [self delegateDidChangeObject:obj
+                              atIndex:index
+                     progressiveIndex:progressiveIndex
+                           changeType:changeType
+                progressiveChangeType:progressiveChangeType
+                             newIndex:newIndex
+                  newProgressiveIndex:newProgressiveIndex];
+        
+        if (changeType == MRTFetchedResultsChangeMove || progressiveChangeType == MRTFetchedResultsChangeMove) {
             [progressiveArray removeObjectAtIndex:progressiveIndex];
             [progressiveArray insertObject:obj atIndex:newProgressiveIndex];
         }
