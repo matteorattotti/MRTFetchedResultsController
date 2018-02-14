@@ -591,15 +591,15 @@
     MRTFetchedResultsController *fetchedResultsController = [self notesFetchedResultsController];
     [fetchedResultsController performFetch:nil];
     
-    // Insert a new object between the two
+    // Insert a new object
     Note *newObject3 = [NSEntityDescription insertNewObjectForEntityForName:@"Note" inManagedObjectContext:self.managedObjectContext];
     newObject3.order = @0;
 
-    // At the same time changing the text of the first note
-    newObject.text = @"changed";
+    // At the same time moving the last elemnt at the top
+    newObject2.order = @(-1);
     
     // Creating a new expectation
-    XCTestExpectation *expectation = [self expectationWithDescription:@"Inser of object notified"];
+    XCTestExpectation *expectation = [self expectationWithDescription:@"Insert of object notified"];
     newObject3.insertExpectation = expectation;
     
     // Waiting for all expectations
@@ -612,9 +612,9 @@
         // Checking number of delegate calls
         [self checkNumberOfWillDidChangeCalls:1];
 
-        XCTAssertTrue([[fetchedResultsController arrangedObjects] indexOfObject:newObject] == 1);
-        XCTAssertTrue([[fetchedResultsController arrangedObjects] indexOfObject:newObject3] == 0);
-        XCTAssertTrue([[fetchedResultsController arrangedObjects] indexOfObject:newObject2] == 2);
+        XCTAssertTrue([[fetchedResultsController arrangedObjects] indexOfObject:newObject] == 2);
+        XCTAssertTrue([[fetchedResultsController arrangedObjects] indexOfObject:newObject3] == 1);
+        XCTAssertTrue([[fetchedResultsController arrangedObjects] indexOfObject:newObject2] == 0);
         
     }];
 }
