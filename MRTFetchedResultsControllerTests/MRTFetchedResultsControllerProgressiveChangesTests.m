@@ -986,6 +986,50 @@
 }
 
 
+- (void) testInsertMoveDeleteUpdate
+{
+    Note *newObject = [NSEntityDescription insertNewObjectForEntityForName:@"Note" inManagedObjectContext:self.managedObjectContext];
+    newObject.order = @1;
+    
+    Note *newObject2 = [NSEntityDescription insertNewObjectForEntityForName:@"Note" inManagedObjectContext:self.managedObjectContext];
+    newObject2.order = @2;
+    
+    Note *newObject3 = [NSEntityDescription insertNewObjectForEntityForName:@"Note" inManagedObjectContext:self.managedObjectContext];
+    newObject3.order = @3;
+    
+    Note *newObject4 = [NSEntityDescription insertNewObjectForEntityForName:@"Note" inManagedObjectContext:self.managedObjectContext];
+    newObject4.order = @4;
+    
+
+    
+    [self.targetArray addObjectsFromArray:@[newObject, newObject2, newObject3, newObject4]];
+    
+    // Creating the fetchedResultsController
+    MRTFetchedResultsController *fetchedResultsController = [self notesFetchedResultsController];
+    [fetchedResultsController performFetch:nil];
+    
+    
+    // Inserting at the top
+    Note *newObject5 = [NSEntityDescription insertNewObjectForEntityForName:@"Note" inManagedObjectContext:self.managedObjectContext];
+    newObject5.order = @0;
+
+    // Moving something at the end
+    newObject2.order = @5;
+    
+    // Deleting something
+    [self.managedObjectContext deleteObject:newObject];
+    
+    // Updating
+    newObject3.text = @"Updated text";
+    
+    // Waiting for the did change expectation
+    [self waitForExpectationsWithTimeout:self.expectationsDefaultTimeout handler:^(NSError *error) {
+        if(error) XCTFail(@"Expectation Failed with error: %@", error);
+        
+        XCTAssertTrue([fetchedResultsController.arrangedObjects isEqualToArray:self.targetArray]);
+    }];
+}
+
 
 #pragma mark - MRTFetchedResultsControllerDelegate
 
