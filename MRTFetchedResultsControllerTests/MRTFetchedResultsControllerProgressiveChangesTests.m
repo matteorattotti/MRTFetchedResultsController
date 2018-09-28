@@ -1031,6 +1031,42 @@
 }
 
 
+- (void) testMoveRefresh
+{
+    Note *newObject = [NSEntityDescription insertNewObjectForEntityForName:@"Note" inManagedObjectContext:self.managedObjectContext];
+    newObject.order = @1;
+    newObject.text = @"A";
+    
+    Note *newObject2 = [NSEntityDescription insertNewObjectForEntityForName:@"Note" inManagedObjectContext:self.managedObjectContext];
+    newObject2.order = @2;
+    newObject2.text = @"B";
+    
+    Note *newObject3 = [NSEntityDescription insertNewObjectForEntityForName:@"Note" inManagedObjectContext:self.managedObjectContext];
+    newObject3.order = @3;
+    newObject3.text = @"C";
+
+    Note *newObject4 = [NSEntityDescription insertNewObjectForEntityForName:@"Note" inManagedObjectContext:self.managedObjectContext];
+    newObject4.order = @4;
+    newObject4.text = @"D";
+    
+    [self.targetArray addObjectsFromArray:@[newObject, newObject2, newObject3, newObject4]];
+    
+    // Creating the fetchedResultsController
+    MRTFetchedResultsController *fetchedResultsController = [self notesFetchedResultsController];
+    [fetchedResultsController performFetch:nil];
+
+    newObject4.order = @0;
+    [self.managedObjectContext refreshObject:newObject4 mergeChanges:YES];
+    
+    // Waiting for the did change expectation
+    [self waitForExpectationsWithTimeout:self.expectationsDefaultTimeout handler:^(NSError *error) {
+        if(error) XCTFail(@"Expectation Failed with error: %@", error);
+        
+        XCTAssertTrue([fetchedResultsController.arrangedObjects isEqualToArray:self.targetArray]);
+    }];
+
+}
+
 #pragma mark - MRTFetchedResultsControllerDelegate
 
 - (void)controllerWillChangeContent:(MRTFetchedResultsController *)controller
