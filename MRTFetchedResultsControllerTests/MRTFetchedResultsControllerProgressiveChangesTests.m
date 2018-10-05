@@ -1067,6 +1067,27 @@
 
 }
 
+- (void)testInsertRefresh
+{
+    // Creating the fetchedResultsController
+    MRTFetchedResultsController *fetchedResultsController = [self notesFetchedResultsController];
+    [fetchedResultsController performFetch:nil];
+
+    Note *newObject = [NSEntityDescription insertNewObjectForEntityForName:@"Note" inManagedObjectContext:self.managedObjectContext];
+    newObject.order = @1;
+    newObject.text = @"A";
+    
+    [self.managedObjectContext refreshObject:newObject mergeChanges:YES];
+        
+    // Waiting for the did change expectation
+    [self waitForExpectationsWithTimeout:self.expectationsDefaultTimeout handler:^(NSError *error) {
+        if(error) XCTFail(@"Expectation Failed with error: %@", error);
+        
+        XCTAssertTrue([fetchedResultsController.arrangedObjects isEqualToArray:self.targetArray]);
+    }];
+    
+}
+
 #pragma mark - MRTFetchedResultsControllerDelegate
 
 - (void)controllerWillChangeContent:(MRTFetchedResultsController *)controller

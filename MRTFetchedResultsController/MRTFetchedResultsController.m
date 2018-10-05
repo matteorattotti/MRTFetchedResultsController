@@ -233,13 +233,13 @@ struct MRTFetchedResultsControllerDelegateHasMethods {
     NSArray *insertedObjects = [[notification.userInfo valueForKey:NSInsertedObjectsKey] allObjects];
     NSArray *deletedObjects = [[notification.userInfo valueForKey:NSDeletedObjectsKey] allObjects];
     NSArray *updatedObjects = [[notification.userInfo valueForKey:NSUpdatedObjectsKey] allObjects];
-    NSArray *refreshedObjects = [[notification.userInfo valueForKey:NSRefreshedObjectsKey] allObjects];
     
-    NSMutableSet *updatedAndRefreshedObjectSet = [NSMutableSet set];
-    [updatedAndRefreshedObjectSet addObjectsFromArray:updatedObjects];
-    [updatedAndRefreshedObjectSet addObjectsFromArray:refreshedObjects];
+    NSMutableSet *refreshedObjectsSet = [[notification.userInfo valueForKey:NSRefreshedObjectsKey] mutableCopy];
+    [refreshedObjectsSet minusSet:[notification.userInfo valueForKey:NSInsertedObjectsKey]];
+    [refreshedObjectsSet minusSet:[notification.userInfo valueForKey:NSDeletedObjectsKey]];
+    [refreshedObjectsSet minusSet:[notification.userInfo valueForKey:NSUpdatedObjectsKey]];
     
-    NSArray *updatedAndRefreshedObject = [updatedAndRefreshedObjectSet allObjects];
+    NSArray *updatedAndRefreshedObject = updatedObjects ? [updatedObjects arrayByAddingObjectsFromArray:refreshedObjectsSet.allObjects] : refreshedObjectsSet.allObjects;
 
     
     BOOL notifyDelegateForFetchedObjects = YES;

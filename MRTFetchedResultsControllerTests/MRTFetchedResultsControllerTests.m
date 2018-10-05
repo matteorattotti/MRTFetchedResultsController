@@ -719,8 +719,11 @@
     [self.privateManagedObjectContext performBlockAndWait:^{
         Note *privateNote = (Note *)[self.privateManagedObjectContext existingObjectWithID:objectID error:nil];
         privateNote.text = @"updated text";
-        [self.privateManagedObjectContext save:nil];
         
+        Note *newObject = [NSEntityDescription insertNewObjectForEntityForName:@"Note" inManagedObjectContext:self.privateManagedObjectContext];
+        newObject.text = @"Inserted new note";
+
+        [self.privateManagedObjectContext save:nil];
     }];
     
     // Waiting for all expectations
@@ -728,7 +731,7 @@
         if(error) XCTFail(@"Expectation Failed with error: %@", error);
        
         // Checking number and type of events
-        [self checkExpectedNumberOfInserts:0 deletes:0 updates:1 moves:0];
+        [self checkExpectedNumberOfInserts:1 deletes:0 updates:1 moves:0];
 
     }];
 }
