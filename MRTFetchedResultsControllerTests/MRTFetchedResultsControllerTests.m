@@ -225,7 +225,6 @@
     XCTAssertEqual([fetchedResultsController count], 0, @"Number of object in the fetchedResultsController doesn't match");
 }
 
-
 #pragma mark - Update
 
 - (void) testUpdate
@@ -359,6 +358,40 @@
         // Checking number of delegate calls
         [self checkNumberOfWillDidChangeCalls:1];
 
+        // Checking total number of object in the controller
+        XCTAssertEqual([fetchedResultsController count], 0, @"Number of object in the fetchedResultsController doesn't match");
+    }];
+}
+
+- (void) testMultipleDeletion
+{
+    // Inserting a new object inside the managedObjectContext
+    Note *newObject = [NSEntityDescription insertNewObjectForEntityForName:@"Note" inManagedObjectContext:self.managedObjectContext];
+    // Inserting a new object inside the managedObjectContext
+    Note *newObject2 = [NSEntityDescription insertNewObjectForEntityForName:@"Note" inManagedObjectContext:self.managedObjectContext];
+
+    // Creating the fetchedResultsController
+    MRTFetchedResultsController *fetchedResultsController = [self notesFetchedResultsController];
+    [fetchedResultsController performFetch:nil];
+    
+    // Deleting the object
+    [self.managedObjectContext deleteObject:newObject];
+    [self.managedObjectContext deleteObject:newObject2];
+
+    // Creating a new expectation
+    XCTestExpectation *expectation = [self expectationWithDescription:@"Delete of object notified"];
+    newObject2.deleteExpectation = expectation;
+    
+    // Waiting for all expectations
+    [self waitForExpectationsWithTimeout:self.expectationsDefaultTimeout handler:^(NSError *error) {
+        if(error) XCTFail(@"Expectation Failed with error: %@", error);
+        
+        // Checking number and type of events
+        [self checkExpectedNumberOfInserts:0 deletes:2 updates:0 moves:0];
+        
+        // Checking number of delegate calls
+        [self checkNumberOfWillDidChangeCalls:1];
+        
         // Checking total number of object in the controller
         XCTAssertEqual([fetchedResultsController count], 0, @"Number of object in the fetchedResultsController doesn't match");
     }];

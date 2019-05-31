@@ -109,8 +109,10 @@ struct MRTFetchedResultsControllerDelegateHasMethods {
     
     if (success) {
         // Arranging objects
-        [self updateArrangedObjects];
-
+        //[self updateArrangedObjects];
+        [self filterArrangedObjects];
+        [self sortArrangedObjects];
+        
         // Setting us as observer of the managed object context
         [self setupMocObserver];
     }
@@ -153,14 +155,14 @@ struct MRTFetchedResultsControllerDelegateHasMethods {
 {
     _sortDescriptors = sortDescriptors;
     
-    [self updateArrangedObjects];
+    [self sortArrangedObjects];
 }
 
 - (void) setFilterPredicate:(NSPredicate *)filterPredicate
 {
     _filterPredicate = filterPredicate;
     
-    [self updateArrangedObjects];
+    [self filterArrangedObjects];
 }
 
 - (NSArray *) arrangedObjects
@@ -172,12 +174,10 @@ struct MRTFetchedResultsControllerDelegateHasMethods {
     return _fetchedObjects;
 }
 
-- (void) updateArrangedObjects
+- (void)filterArrangedObjects
 {
-
     if (!_sortDescriptors && !_filterPredicate) {
         _arrangedObjects = nil;
-        _arrangedObjectInMemoryFetchRequest = nil;
     }
     else {
         // Rebuilding the arrangedObjectArray
@@ -187,16 +187,40 @@ struct MRTFetchedResultsControllerDelegateHasMethods {
         if (_filterPredicate) {
             [_arrangedObjects filterUsingPredicate:_filterPredicate];
         }
+    }
+    
+    [self updateArrangedObjectInMemoryFetchRequest];
+}
 
+- (void)sortArrangedObjects
+{
+    if (!_sortDescriptors && !_filterPredicate) {
+        _arrangedObjects = nil;
+    }
+    else {
         // resorting it
         if (_sortDescriptors) {
+            if (!_arrangedObjects) {
+                _arrangedObjects = [NSMutableArray arrayWithArray:_fetchedObjects];
+            }
             [_arrangedObjects sortUsingDescriptors:_sortDescriptors];
         }
+    }
+    
+    [self updateArrangedObjectInMemoryFetchRequest];
+}
 
+- (void)updateArrangedObjectInMemoryFetchRequest
+{
+    if (!_sortDescriptors && !_filterPredicate) {
+        _arrangedObjectInMemoryFetchRequest = nil;
+    }
+    else {
+        
         // creating the in memory fetch request
         _arrangedObjectInMemoryFetchRequest = [[NSFetchRequest alloc] init];
         _arrangedObjectInMemoryFetchRequest.entity = _fetchRequest.entity;
-
+        
         // Adding the sort descriptor (the custom one, or the original one, or nothing)
         if (_sortDescriptors) {
             _arrangedObjectInMemoryFetchRequest.sortDescriptors = _sortDescriptors;
@@ -207,7 +231,7 @@ struct MRTFetchedResultsControllerDelegateHasMethods {
         else {
             _arrangedObjectInMemoryFetchRequest.sortDescriptors = nil;
         }
-
+        
         // Adding the predicate, need the fetch request one + the filter one
         NSMutableArray *predicates = [NSMutableArray array];
         if (_filterPredicate) { [predicates addObject:_filterPredicate]; }
@@ -514,6 +538,10 @@ struct MRTFetchedResultsControllerDelegateHasMethods {
             }
             // Found a gap, finding the previous object in the final array and inserting next to it to pass the gap
             else {
+                // Still haven't found why this happens...
+                if (newIndex == 0 || newIndex == NSNotFound) {
+                    continue;
+                }
                 newProgressiveIndex = [progressiveArray indexOfObjectIdenticalTo:[newContainer objectAtIndex:newIndex-1]] +1;
             }
             
