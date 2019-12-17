@@ -484,10 +484,15 @@ struct MRTFetchedResultsControllerDelegateHasMethods {
     
     BOOL wantProgressiveChanges = self.delegateHas.delegateHasDidChangeObjectWithProgressiveChanges;
     
+    NSMutableIndexSet *deletedIndexes = [NSMutableIndexSet indexSet];
+    NSMutableIndexSet *insertedIndexes = [NSMutableIndexSet indexSet];
+    
     // DELETED
     for (id obj in deletedObjects) {
         NSUInteger index = [oldContainer indexOfObjectIdenticalTo:obj];
         NSUInteger progressiveIndex = [progressiveArray indexOfObjectIdenticalTo:obj];
+        
+        [deletedIndexes addIndex:index];
         
         [progressiveArray removeObjectAtIndex:progressiveIndex];
         
@@ -505,6 +510,8 @@ struct MRTFetchedResultsControllerDelegateHasMethods {
     for (id obj in insertedObjects) {
         NSUInteger newIndex = [newContainer indexOfObjectIdenticalTo:obj];
         [progressiveArray insertObject:obj atIndex:newIndex];
+        
+        [insertedIndexes addIndex:newIndex];
         
         [self delegateDidChangeObject:obj
                               atIndex:NSNotFound
@@ -557,6 +564,17 @@ struct MRTFetchedResultsControllerDelegateHasMethods {
         // Checking if the change is an update or a move
         MRTFetchedResultsChangeType changeType = (index == newIndex) ? MRTFetchedResultsChangeUpdate : MRTFetchedResultsChangeMove;
         MRTFetchedResultsChangeType progressiveChangeType = (progressiveIndex == newProgressiveIndex) ? MRTFetchedResultsChangeUpdate : MRTFetchedResultsChangeMove;
+        
+        // There is a special case where we still need to mark an update as a move (just to maintain the compatibility with NSFetchedResultsController)
+        // Check "testUpdateThatActuallyIsAMove" to understand this :)
+        if (changeType == MRTFetchedResultsChangeUpdate) {
+            NSUInteger deletions = [deletedIndexes countOfIndexesInRange:NSMakeRange(0, index)];
+            NSUInteger insertions = [insertedIndexes countOfIndexesInRange:NSMakeRange(0, index)];
+            
+            if (deletions != insertions) {
+                changeType = MRTFetchedResultsChangeMove;
+            }
+        }
         
         [self delegateDidChangeObject:obj
                               atIndex:index

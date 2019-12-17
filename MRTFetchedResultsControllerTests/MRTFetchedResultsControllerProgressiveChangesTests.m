@@ -1088,6 +1088,51 @@
     
 }
 
+- (void)testUpdateThatActuallyIsAMove
+{
+    // Inserting a new object inside the managedObjectContext
+    Note *newObject = [NSEntityDescription insertNewObjectForEntityForName:@"Note" inManagedObjectContext:self.managedObjectContext];
+    newObject.order = @0;
+    newObject.pinned = @1;
+    newObject.text = @"Pinned";
+    
+    // Inserting a new object inside the managedObjectContext
+    Note *newObject2 = [NSEntityDescription insertNewObjectForEntityForName:@"Note" inManagedObjectContext:self.managedObjectContext];
+    newObject2.order = @1;
+    newObject2.conflicted = @1;
+    newObject2.text = @"Conflict 1";
+    
+    // Inserting a new object inside the managedObjectContext
+    Note *newObject3 = [NSEntityDescription insertNewObjectForEntityForName:@"Note" inManagedObjectContext:self.managedObjectContext];
+    newObject3.order = @2;
+    newObject3.conflicted = @1;
+    newObject3.text = @"Conflict 2";
+    
+    [self.targetArray addObjectsFromArray:@[newObject2, newObject3, newObject]];
+
+    // Creating the fetchedResultsController
+    NSSortDescriptor *conflictedSortDescriptor = [NSSortDescriptor sortDescriptorWithKey:@"conflicted" ascending:NO];
+    NSSortDescriptor *pinnedSort = [[NSSortDescriptor alloc] initWithKey:@"pinned" ascending:NO];
+    NSSortDescriptor *order = [[NSSortDescriptor alloc] initWithKey:@"order" ascending:YES];
+    
+    MRTFetchedResultsController *fetchedResultsController = [self notesFetchedResultsController];
+    
+    [fetchedResultsController setSortDescriptors: @[conflictedSortDescriptor, pinnedSort, order]];
+    [fetchedResultsController performFetch:nil];
+
+    // Deleting the first object
+    [self.managedObjectContext deleteObject:newObject2];
+    newObject3.conflicted = nil;
+
+    // Waiting for the did change expectation
+    [self waitForExpectationsWithTimeout:self.expectationsDefaultTimeout handler:^(NSError *error) {
+        if(error) XCTFail(@"Expectation Failed with error: %@", error);
+        
+        XCTAssertTrue([fetchedResultsController.arrangedObjects isEqualToArray:self.targetArray]);
+    }];
+}
+
+
 #pragma mark - MRTFetchedResultsControllerDelegate
 
 - (void)controllerWillChangeContent:(MRTFetchedResultsController *)controller

@@ -11,6 +11,57 @@
 #import "MRTFetchedResultsController.h"
 #import "Note.h"
 
+@interface MRTChangeType : NSObject
+
+@property (assign) NSUInteger index;
+@property (assign) NSUInteger newIndex;
+@property (assign) NSUInteger type;
+@property (assign) NSUInteger computedHash;
+
++ (MRTChangeType *)changeWithType:(NSUInteger)type index:(NSUInteger)index newIndex:(NSUInteger)newIndex;
+
+@end
+
+@implementation MRTChangeType
+
++ (MRTChangeType *)changeWithType:(NSUInteger)type index:(NSUInteger)index newIndex:(NSUInteger)newIndex
+{
+    MRTChangeType *change = [MRTChangeType new];
+    change.type = type;
+    change.index = index;
+    change.newIndex = newIndex;
+    
+    return change;
+}
+
+- (BOOL)isEqual:(id)object
+{
+    if (object == self) { return YES; };
+    if (!object || ![object isKindOfClass:[self class]]) { return NO; };
+     
+    return self.index == [object index] &&
+           self.newIndex == [object newIndex] &&
+           self.type == [(MRTChangeType *)object type];
+}
+
+- (NSUInteger)hash
+{
+    if (_computedHash == 0) {
+        _computedHash = [[NSString stringWithFormat:@"%lu-%lu-%lu", self.index, self.newIndex, self.type] hash];
+    }
+    
+    return _computedHash;
+}
+
+
+- (NSString *)description
+{
+    return [NSString stringWithFormat:@"Type: %lu index: %lu newIndex: %lu", self.type, self.index, self.newIndex];
+}
+
+
+@end
+
 @interface MRTFetchedResultsControllerTests : XCTestCase <MRTFetchedResultsControllerDelegate>
 
 @property (strong) NSManagedObjectContext *managedObjectContext;
@@ -25,6 +76,9 @@
 
 @property (nonatomic) NSUInteger numberOfWillChangeContext;
 @property (nonatomic) NSUInteger numberOfDidChangeContext;
+
+@property (nonatomic) NSMutableArray *ourChanges;
+@property (nonatomic) NSMutableArray *appleChanges;
 
 @end
 
@@ -46,6 +100,9 @@
     
     self.numberOfWillChangeContext = 0;
     self.numberOfDidChangeContext = 0;
+    
+    self.ourChanges = [NSMutableArray array];
+    self.appleChanges = [NSMutableArray array];
 }
 
 - (void) setupCoreData
@@ -436,6 +493,7 @@
     XCTAssertEqual([fetchedResultsController indexOfObject:newObject3], 1, @"Wrong order of object after insertion");
 }
 
+
 - (void) testDeletionWithPredicateMatchedObject
 {
     // Inserting a matching object
@@ -817,7 +875,7 @@
 }
 
 
-#pragma mark - Multiply Changes
+#pragma mark - Multiple Changes
 
 - (void) testMultipleTypeOfChanges
 {
@@ -892,6 +950,51 @@
     
     NSLog(@"%@", [fetchedResultsController arrangedObjects]);
 }
+
+- (void)testUpdateThatActuallyIsAMove
+{
+    // Inserting a new object inside the managedObjectContext
+    Note *newObject = [NSEntityDescription insertNewObjectForEntityForName:@"Note" inManagedObjectContext:self.managedObjectContext];
+    newObject.order = @0;
+    newObject.pinned = @1;
+    newObject.text = @"Pinned";
+    
+    // Inserting a new object inside the managedObjectContext
+    Note *newObject2 = [NSEntityDescription insertNewObjectForEntityForName:@"Note" inManagedObjectContext:self.managedObjectContext];
+    newObject2.order = @1;
+    newObject2.conflicted = @1;
+    newObject2.text = @"Conflict 1";
+    
+    // Inserting a new object inside the managedObjectContext
+    Note *newObject3 = [NSEntityDescription insertNewObjectForEntityForName:@"Note" inManagedObjectContext:self.managedObjectContext];
+    newObject3.order = @2;
+    newObject3.conflicted = @1;
+    newObject3.text = @"Conflict 2";
+    
+    // Creating the fetchedResultsController
+    
+    NSSortDescriptor *conflictedSortDescriptor = [NSSortDescriptor sortDescriptorWithKey:@"conflicted" ascending:NO];
+    NSSortDescriptor *pinnedSort = [[NSSortDescriptor alloc] initWithKey:@"pinned" ascending:NO];
+    NSSortDescriptor *order = [[NSSortDescriptor alloc] initWithKey:@"order" ascending:YES];
+    
+    MRTFetchedResultsController *fetchedResultsController = [self notesFetchedResultsController];
+    
+    [fetchedResultsController setSortDescriptors: @[conflictedSortDescriptor, pinnedSort, order]];
+    [fetchedResultsController performFetch:nil];
+
+    NSFetchedResultsController *appleFetchedResultsController = [self appleFetchedResultControllerFromMRTFetchedResultController:fetchedResultsController];
+    [appleFetchedResultsController performFetch:nil];
+    
+    // Deleting the first object
+    [self.managedObjectContext deleteObject:newObject2];
+    newObject3.conflicted = nil;
+
+    // Waiting for the delegate notifications
+    CFRunLoopRunInMode( kCFRunLoopDefaultMode, self.expectationsDefaultTimeout, NO );
+
+    XCTAssertEqualObjects(self.ourChanges, self.appleChanges);
+}
+
 
 #pragma mark - Arranged Objects
 
@@ -1213,6 +1316,21 @@
 }
 
 
+- (NSFetchedResultsController *) appleFetchedResultControllerFromMRTFetchedResultController:(MRTFetchedResultsController *) mrtFetchedResultController
+{
+    NSFetchRequest *fr = mrtFetchedResultController.fetchRequest;
+    fr.sortDescriptors = mrtFetchedResultController.sortDescriptors ?: mrtFetchedResultController.fetchRequest.sortDescriptors;
+    NSFetchedResultsController *appleFetchedResultsController = [[NSFetchedResultsController alloc] initWithFetchRequest:fr
+                                                                                                    managedObjectContext:self.managedObjectContext
+                                                                                                      sectionNameKeyPath:nil
+                                                                                                               cacheName:nil];
+    
+    appleFetchedResultsController.delegate = self;
+    
+    return appleFetchedResultsController;
+}
+
+
 #pragma mark - Utils
 
 - (void) checkExpectedNumberOfInserts: (NSUInteger) inserts deletes: (NSUInteger) deletes updates: (NSUInteger) updates moves: (NSUInteger) moves
@@ -1247,6 +1365,8 @@
     //NSLog(@"did change object %@ type %lu", anObject, type);
     NSLog(@"did change index %lu new index %lu", (unsigned long)index, (unsigned long)newIndex);
 
+    [self.ourChanges addObject:[MRTChangeType changeWithType:type index:index newIndex:newIndex]];
+    
     switch (type) {
         case MRTFetchedResultsChangeDelete:
             self.numberOfDeletes++;
@@ -1267,6 +1387,18 @@
         default:
             break;
     }
+}
+
+- (void)controller:(NSFetchedResultsController *)controller
+   didChangeObject:(id)anObject
+       atIndexPath:(NSIndexPath *)indexPath
+     forChangeType:(NSFetchedResultsChangeType)type
+      newIndexPath:(NSIndexPath *)newIndexPath;
+{
+    [self.appleChanges addObject:[MRTChangeType changeWithType:type index:indexPath ? indexPath.item : NSNotFound newIndex:newIndexPath ? newIndexPath.item : NSNotFound]];
+
+    
+    NSLog(@"did change %lu %@ %@", type, indexPath, newIndexPath);
 }
 
 @end

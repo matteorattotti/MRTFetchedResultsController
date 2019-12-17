@@ -11,6 +11,8 @@
 
 @implementation Note
 
+@dynamic pinned;
+@dynamic conflicted;
 @dynamic text;
 @dynamic order;
 @dynamic trashed;

@@ -13,6 +13,8 @@
 
 @interface Note : TestableEntity
 
+@property (nonatomic, retain) NSNumber * pinned;
+@property (nonatomic, retain) NSNumber * conflicted;
 @property (nonatomic, retain) NSString * text;
 @property (nonatomic, retain) NSNumber * order;
 @property (nonatomic, retain) NSNumber * trashed;
