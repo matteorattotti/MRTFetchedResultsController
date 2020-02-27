@@ -11,58 +11,16 @@
 #import "MRTFetchedResultsController.h"
 #import "Note.h"
 
-@interface MRTChangeType : NSObject
+@interface MRTFetchedResultsControllerChange ()
 
-@property (assign) NSUInteger index;
-@property (assign) NSUInteger newIndex;
-@property (assign) NSUInteger type;
-@property (assign) NSUInteger computedHash;
-
-+ (MRTChangeType *)changeWithType:(NSUInteger)type index:(NSUInteger)index newIndex:(NSUInteger)newIndex;
+- (instancetype)initWithObject:(id)anObject
+                         index:(NSUInteger)index
+                      newIndex:(NSUInteger)newIndex
+                          type:(MRTFetchedResultsChangeType)type;
 
 @end
 
-@implementation MRTChangeType
-
-+ (MRTChangeType *)changeWithType:(NSUInteger)type index:(NSUInteger)index newIndex:(NSUInteger)newIndex
-{
-    MRTChangeType *change = [MRTChangeType new];
-    change.type = type;
-    change.index = index;
-    change.newIndex = newIndex;
-    
-    return change;
-}
-
-- (BOOL)isEqual:(id)object
-{
-    if (object == self) { return YES; };
-    if (!object || ![object isKindOfClass:[self class]]) { return NO; };
-     
-    return self.index == [object index] &&
-           self.newIndex == [object newIndex] &&
-           self.type == [(MRTChangeType *)object type];
-}
-
-- (NSUInteger)hash
-{
-    if (_computedHash == 0) {
-        _computedHash = [[NSString stringWithFormat:@"%lu-%lu-%lu", self.index, self.newIndex, self.type] hash];
-    }
-    
-    return _computedHash;
-}
-
-
-- (NSString *)description
-{
-    return [NSString stringWithFormat:@"Type: %lu index: %lu newIndex: %lu", self.type, self.index, self.newIndex];
-}
-
-
-@end
-
-@interface MRTFetchedResultsControllerTests : XCTestCase <MRTFetchedResultsControllerDelegate>
+@interface MRTFetchedResultsControllerTests : XCTestCase <MRTFetchedResultsControllerDelegate, NSFetchedResultsControllerDelegate>
 
 @property (strong) NSManagedObjectContext *managedObjectContext;
 @property (strong) NSManagedObjectContext *privateManagedObjectContext;
@@ -76,6 +34,8 @@
 
 @property (nonatomic) NSUInteger numberOfWillChangeContext;
 @property (nonatomic) NSUInteger numberOfDidChangeContext;
+
+@property (nonatomic) NSArray<MRTFetchedResultsControllerChange *> *changesInDidEndChanging;
 
 @property (nonatomic) NSMutableArray *ourChanges;
 @property (nonatomic) NSMutableArray *appleChanges;
@@ -1339,6 +1299,9 @@
     XCTAssertEqual(self.numberOfDeletes, deletes, @"Number of deletes doesn't match");
     XCTAssertEqual(self.numberOfUpdates, updates, @"Number of updates doesn't match");
     XCTAssertEqual(self.numberOfMoves,   moves  , @"Number of moves doesn't match");
+    
+    // Checking number and type of events in the DidEndChanging callback as well
+    [self checkChangesInDidEndChangingForExpectedNumberOfInserts:inserts deletes:deletes updates:updates moves:moves];
 }
 
 - (void) checkNumberOfWillDidChangeCalls: (NSUInteger) numberOfCalls
@@ -1347,47 +1310,86 @@
     XCTAssertEqual(self.numberOfDidChangeContext, numberOfCalls, @"Number of didChangeContext doesn't match");
 }
 
+- (void) checkChangesInDidEndChangingForExpectedNumberOfInserts:(NSUInteger)inserts
+                                                        deletes:(NSUInteger)deletes
+                                                        updates:(NSUInteger)updates
+                                                          moves:(NSUInteger)moves
+{
+    NSUInteger numberOfInserts = 0;
+    NSUInteger numberOfDeletes = 0;
+    NSUInteger numberOfUpdates = 0;
+    NSUInteger numberOfMoves = 0;
+    for (MRTFetchedResultsControllerChange *change in self.changesInDidEndChanging)
+    {
+        switch (change.type) {
+            case MRTFetchedResultsChangeDelete:
+                numberOfDeletes++;
+                break;
+            case MRTFetchedResultsChangeInsert:
+                numberOfInserts++;
+                break;
+            case MRTFetchedResultsChangeUpdate:
+                numberOfUpdates++;
+                break;
+            case MRTFetchedResultsChangeMove:
+                numberOfMoves++;
+                break;
+            default:
+                break;
+        }
+    }
+    XCTAssertEqual(numberOfInserts, inserts, @"Number of inserts doesn't match");
+    XCTAssertEqual(numberOfDeletes, deletes, @"Number of deletes doesn't match");
+    XCTAssertEqual(numberOfUpdates, updates, @"Number of updates doesn't match");
+    XCTAssertEqual(numberOfMoves,   moves  , @"Number of moves doesn't match");
+}
+
 #pragma mark - MRTFetchedResultsControllerDelegate
 
-- (void)controllerWillChangeContent:(MRTFetchedResultsController *)controller
+- (void)fetchedResultsControllerWillBeginChanging:(MRTFetchedResultsController *)controller
 {
     self.numberOfWillChangeContext++;
 }
 
-- (void)controllerDidChangeContent:(MRTFetchedResultsController *)controller
+- (void)fetchedResultsController:(MRTFetchedResultsController *)controller
+                  didEndChanging:(NSArray<MRTFetchedResultsControllerChange *> *)changes
 {
     self.numberOfDidChangeContext++;
+    self.changesInDidEndChanging = changes;
 }
 
 
-- (void)controller:(MRTFetchedResultsController *)controller didChangeObject:(id)anObject atIndex:(NSUInteger)index forChangeType:(MRTFetchedResultsChangeType)type newIndex:(NSUInteger)newIndex
+- (void)fetchedResultsController:(MRTFetchedResultsController *)controller
+                       didChange:(MRTFetchedResultsControllerChange *)change
 {
     //NSLog(@"did change object %@ type %lu", anObject, type);
-    NSLog(@"did change index %lu new index %lu", (unsigned long)index, (unsigned long)newIndex);
+    NSLog(@"did change index %lu new index %lu", (unsigned long)change.index, (unsigned long)change.newIndex);
 
-    [self.ourChanges addObject:[MRTChangeType changeWithType:type index:index newIndex:newIndex]];
+    [self.ourChanges addObject:change];
     
-    switch (type) {
+    switch (change.type) {
         case MRTFetchedResultsChangeDelete:
             self.numberOfDeletes++;
-            [[anObject deleteExpectation] fulfill];
+            [[(TestableEntity *)change.object deleteExpectation] fulfill];
             break;
         case MRTFetchedResultsChangeInsert:
             self.numberOfInserts++;
-            [[anObject insertExpectation] fulfill];
+            [[(TestableEntity *)change.object insertExpectation] fulfill];
             break;
         case MRTFetchedResultsChangeUpdate:
             self.numberOfUpdates++;
-            [[anObject updateExpectation] fulfill];
+            [[(TestableEntity *)change.object updateExpectation] fulfill];
             break;
         case MRTFetchedResultsChangeMove:
             self.numberOfMoves++;
-            [[anObject moveExpectation] fulfill];
+            [[(TestableEntity *)change.object moveExpectation] fulfill];
             break;
         default:
             break;
     }
 }
+
+#pragma mark - NSFetchedResultsControllerDelegate
 
 - (void)controller:(NSFetchedResultsController *)controller
    didChangeObject:(id)anObject
@@ -1395,9 +1397,12 @@
      forChangeType:(NSFetchedResultsChangeType)type
       newIndexPath:(NSIndexPath *)newIndexPath;
 {
-    [self.appleChanges addObject:[MRTChangeType changeWithType:type index:indexPath ? indexPath.item : NSNotFound newIndex:newIndexPath ? newIndexPath.item : NSNotFound]];
+    MRTFetchedResultsControllerChange *change = [[MRTFetchedResultsControllerChange alloc] initWithObject:anObject
+                                                                                                    index:(indexPath ? indexPath.item : NSNotFound)
+                                                                                                 newIndex:(newIndexPath ? newIndexPath.item : NSNotFound)
+                                                                                                     type:type];
+    [self.appleChanges addObject:change];
 
-    
     NSLog(@"did change %lu %@ %@", type, indexPath, newIndexPath);
 }
 

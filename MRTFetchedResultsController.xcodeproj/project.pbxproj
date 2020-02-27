@@ -16,6 +16,7 @@
 		0CA948151FD581D200728A40 /* NSSet+Combinatorics.m in Sources */ = {isa = PBXBuildFile; fileRef = 0CA948131FD581D200728A40 /* NSSet+Combinatorics.m */; };
 		0CBB3BCC1F0651150053B8B9 /* MRTTestMoveHelper.m in Sources */ = {isa = PBXBuildFile; fileRef = 0CBB3BCB1F0651150053B8B9 /* MRTTestMoveHelper.m */; };
 		0CBB3BCF1F0674A70053B8B9 /* NSArray+Permutation.m in Sources */ = {isa = PBXBuildFile; fileRef = 0CBB3BCE1F0674A70053B8B9 /* NSArray+Permutation.m */; };
+		9F88AEB72407DC3D00C90A28 /* MRTFetchedResultsControllerCallbackOrderTests.m in Sources */ = {isa = PBXBuildFile; fileRef = 9F88AEB62407DC3C00C90A28 /* MRTFetchedResultsControllerCallbackOrderTests.m */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -36,6 +37,7 @@
 		0CBB3BCB1F0651150053B8B9 /* MRTTestMoveHelper.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = MRTTestMoveHelper.m; sourceTree = "<group>"; };
 		0CBB3BCD1F0674A70053B8B9 /* NSArray+Permutation.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = "NSArray+Permutation.h"; sourceTree = "<group>"; };
 		0CBB3BCE1F0674A70053B8B9 /* NSArray+Permutation.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = "NSArray+Permutation.m"; sourceTree = "<group>"; };
+		9F88AEB62407DC3C00C90A28 /* MRTFetchedResultsControllerCallbackOrderTests.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = MRTFetchedResultsControllerCallbackOrderTests.m; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -80,6 +82,7 @@
 			children = (
 				0C351CF61B049829002AE121 /* MRTFetchedResultsControllerTests.m */,
 				0C4980C81DA6561F00DB986D /* MRTFetchedResultsControllerProgressiveChangesTests.m */,
+				9F88AEB62407DC3C00C90A28 /* MRTFetchedResultsControllerCallbackOrderTests.m */,
 				0CBB3BCA1F0651150053B8B9 /* MRTTestMoveHelper.h */,
 				0CBB3BCB1F0651150053B8B9 /* MRTTestMoveHelper.m */,
 				0CBB3BCD1F0674A70053B8B9 /* NSArray+Permutation.h */,
@@ -150,6 +153,7 @@
 			developmentRegion = English;
 			hasScannedForEncodings = 0;
 			knownRegions = (
+				English,
 				en,
 			);
 			mainGroup = 0C351CE31B0494B8002AE121;
@@ -179,6 +183,7 @@
 			files = (
 				0C4980C91DA6561F00DB986D /* MRTFetchedResultsControllerProgressiveChangesTests.m in Sources */,
 				0C351D481B04E4E8002AE121 /* Note.m in Sources */,
+				9F88AEB72407DC3D00C90A28 /* MRTFetchedResultsControllerCallbackOrderTests.m in Sources */,
 				0C351CFB1B04982F002AE121 /* MRTFetchedResultsController.m in Sources */,
 				0CBB3BCF1F0674A70053B8B9 /* NSArray+Permutation.m in Sources */,
 				0C351CF71B049829002AE121 /* MRTFetchedResultsControllerTests.m in Sources */,

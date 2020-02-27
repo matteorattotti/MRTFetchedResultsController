@@ -1135,41 +1135,37 @@
 
 #pragma mark - MRTFetchedResultsControllerDelegate
 
-- (void)controllerWillChangeContent:(MRTFetchedResultsController *)controller
+- (void)fetchedResultsControllerWillBeginChanging:(MRTFetchedResultsController *)controller
 {
 }
 
-- (void)controllerDidChangeContent:(MRTFetchedResultsController *)controller
+- (void)fetchedResultsControllerDidEndChanging:(MRTFetchedResultsController *)controller
 {
     [self.didChangeContentExpectation fulfill];
 }
 
 
-- (void)controller:(MRTFetchedResultsController *)controller
-   didChangeObject:(id)anObject
-           atIndex:(NSUInteger)index
-  progressiveIndex:(NSUInteger) progressiveIndex
-     forChangeType:(MRTFetchedResultsChangeType)changeType
-forProgressiveChangeType:(MRTFetchedResultsChangeType)progressiveChangeType
-          newIndex:(NSUInteger)newIndex
-newProgressiveIndex:(NSUInteger) newProgressiveIndex;
+- (void)fetchedResultsController:(MRTFetchedResultsController *)controller
+                       didChange:(MRTFetchedResultsControllerChange *)change
+               progressiveChange:(MRTFetchedResultsControllerChange *)progressiveChange
+
 {
-    switch (progressiveChangeType) {
+    switch (progressiveChange.type) {
         case MRTFetchedResultsChangeDelete:
-            NSLog(@"deleted %@ at %lu", [anObject text], progressiveIndex);
-            [self.targetArray removeObjectAtIndex:progressiveIndex];
+            NSLog(@"deleted %@ at %lu", [(Note *)progressiveChange.object text], progressiveChange.index);
+            [self.targetArray removeObjectAtIndex:progressiveChange.index];
             break;
         case MRTFetchedResultsChangeInsert:
-            NSLog(@"inserted %@ at %lu", [anObject text], newProgressiveIndex);
-            [self.targetArray insertObject:anObject atIndex:newProgressiveIndex];
+            NSLog(@"inserted %@ at %lu", [(Note *)progressiveChange.object text], progressiveChange.newIndex);
+            [self.targetArray insertObject:progressiveChange.object atIndex:progressiveChange.newIndex];
             break;
         case MRTFetchedResultsChangeUpdate:
-            NSLog(@"update %@ at %lu", [anObject text], progressiveIndex);
+            NSLog(@"update %@ at %lu", [(Note *)progressiveChange.object text], progressiveChange.index);
             break;
         case MRTFetchedResultsChangeMove:
-            NSLog(@"move %@ from %lu in %lu", [anObject text], (unsigned long)progressiveIndex, (unsigned long)newProgressiveIndex);
-            [self.targetArray removeObjectAtIndex:progressiveIndex];
-            [self.targetArray insertObject:anObject atIndex:newProgressiveIndex];
+            NSLog(@"move %@ from %lu in %lu", [(Note *)progressiveChange.object text], (unsigned long)progressiveChange.index, (unsigned long)progressiveChange.newIndex);
+            [self.targetArray removeObjectAtIndex:progressiveChange.index];
+            [self.targetArray insertObject:progressiveChange.object atIndex:progressiveChange.newIndex];
             NSLog(@"target %@", self.targetArray);
             break;
         default:
