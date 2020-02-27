@@ -17,6 +17,7 @@ enum {
 };
 typedef NSUInteger MRTFetchedResultsChangeType;
 
+@class MRTFetchedResultsControllerChange;
 @protocol MRTFetchedResultsControllerDelegate;
 
 @interface MRTFetchedResultsController : NSObject <NSCopying>
@@ -24,7 +25,7 @@ typedef NSUInteger MRTFetchedResultsChangeType;
 @property (nonatomic, assign) id<MRTFetchedResultsControllerDelegate> delegate;
 
 /** 
- Objects fetched from the managed object context. -performFetch: must be called before accessing fetchedObjects, otherwise a nil array will be returned 
+ Objects fetched from the managed object context. -performFetch: must be called before accessing fetchedObjects, otherwise a nil array will be returned
  */
 @property (nonatomic, retain, readonly) NSArray *fetchedObjects;
 
@@ -43,7 +44,7 @@ typedef NSUInteger MRTFetchedResultsChangeType;
 @property (nonatomic, copy) NSArray *sortDescriptors;
 
 /**
- Creates a new SNRFetchedResultsController object with the specified managed object context and fetch request
+ Creates a new MRTFetchedResultsController object with the specified managed object context and fetch request
  @param context The managed object context
  @param request The fetch request
  */
@@ -68,50 +69,82 @@ typedef NSUInteger MRTFetchedResultsChangeType;
 @protocol MRTFetchedResultsControllerDelegate <NSObject>
 @optional
 
+#pragma mark - BEFORE THE CHANGES ARE APPLIED
+
 /**
  Called right before the controller is about to make one or more changes to the content array
  @param controller The fetched results controller
  */
-- (void)controllerWillChangeContent:(MRTFetchedResultsController *)controller;
+- (void)fetchedResultsControllerWillBeginChanging:(MRTFetchedResultsController *)controller;
+
+#pragma mark - THE CHANGES ARE BEING APPLIED
+/* Implement *only one* of these callbacks (if more than one are implemented - only the one with more arguments will be called) */
 
 /**
- Called right after the controller has made one or more changes to the content array
+ Called for each change that is made to the content array. This method could be called multiple times throughout the change processing. This method is called if fetchedResultsController:didChange:progressiveChange: is not implemented
  @param controller The fetched results controller
+ @param change The complete information of the change referred to the initial state of the managed objects
  */
-- (void)controllerDidChangeContent:(MRTFetchedResultsController *)controller;
+- (void)fetchedResultsController:(MRTFetchedResultsController *)controller
+                       didChange:(MRTFetchedResultsControllerChange *)change;
 
 /**
- Called for each change that is made to the content array. This method will be called multiple times throughout the change processing.
+ Called for each change that is made to the content array. This method could be called multiple times throughout the change processing. If this method is implemented no other didChange callback is called
  @param controller The fetched results controller
- @param anObject The object that was updated, deleted, inserted, or moved
- @param index The original index of the object. If the object was inserted and did not exist previously, this will be NSNotFound
- @param type The type of change (update, insert, delete, or move)
- @param newIndex The new index of the object. If the object was deleted, the newIndex will be NSNotFound.
+ @param change The complete information of the change referred to the initial state of the managed objects
+ @param progressiveChange The complete information of the change with the indexes referred to the state of the managed objects after the previous changes are applied
  */
-- (void)controller:(MRTFetchedResultsController *)controller
-   didChangeObject:(id)anObject
-           atIndex:(NSUInteger)index
-     forChangeType:(MRTFetchedResultsChangeType)type
-          newIndex:(NSUInteger)newIndex;
+- (void)fetchedResultsController:(MRTFetchedResultsController *)controller
+                       didChange:(MRTFetchedResultsControllerChange *)change
+               progressiveChange:(MRTFetchedResultsControllerChange *)progressiveChange;
+
+#pragma mark - AFTER THE CHANGES ARE APPLIED
+/* Implement *only one* of these callbacks (if more than one are implemented - only the one with more arguments will be called) */
 
 /**
- Called for each change that is made to the content array. This method will be called multiple times throughout the change processing.
- If the delegate implement this methods this will called instead of controller:didChangeObject:atIndex:forChangeType:newIndex:
+ Called right after the controller has finished making changes to the content array. This method is called if fetchedResultsController:didChangeContent:progressiveChange AND fetchedResultsController:didChangeContent are both not implemented
  @param controller The fetched results controller
- @param anObject The object that was updated, deleted, inserted, or moved
- @param index The original index of the object. If the object was inserted and did not exist previously, this will be NSNotFound
- @param progressiveIndex the original index corrected keeping in consideration the previous change in the same batch (Usefull for keeping another array in sync, or for macOS NSTableView as it does't batch changes like on iOS
- @param type The type of change (update, insert, delete, or move)
- @param newIndex The new index of the object. If the object was deleted, the newIndex will be NSNotFound.
- @param newProgressiveIndex new index of the object keeping in consideration the previous change in the same batch.
  */
-- (void)controller:(MRTFetchedResultsController *)controller
-   didChangeObject:(id)anObject
-           atIndex:(NSUInteger)index
-  progressiveIndex:(NSUInteger) progressiveIndex
-     forChangeType:(MRTFetchedResultsChangeType)changeType
-forProgressiveChangeType:(MRTFetchedResultsChangeType)progressiveChangeType
-          newIndex:(NSUInteger)newIndex
-newProgressiveIndex:(NSUInteger) newProgressiveIndex;
+- (void)fetchedResultsControllerDidEndChanging:(MRTFetchedResultsController *)controller;
+
+/**
+ Called right after the controller has finished making changes to the content array. This method is called if fetchedResultsController:didChangeContent:progressiveChange is not implemented
+ @param controller The fetched results controller
+ @param changes The array of changes performed in the current change batch referred to the initial state of the managed objects before the changes batch
+ */
+- (void)fetchedResultsController:(MRTFetchedResultsController *)controller
+                  didEndChanging:(NSArray <MRTFetchedResultsControllerChange *> *)changes;
+
+/**
+ Called right after the controller has finished making changes to the content array. If this method is implemented no other didEndChanging: callback is called
+ @param controller The fetched results controller
+ @param changes The array of changes performed in the current change batch referred to the initial state of the managed objects before the changes batch
+ @param progressiveChanges The array of changes performed in the current change batch each referred to the state/indexes of the managed objects after the previous change was applied
+ */
+- (void)fetchedResultsController:(MRTFetchedResultsController *)controller
+                  didEndChanging:(NSArray <MRTFetchedResultsControllerChange *> *)changes
+              progressiveChanges:(NSArray <MRTFetchedResultsControllerChange *> *)progressiveChanges;
+
+@end
+
+
+@interface MRTFetchedResultsControllerChange : NSObject
+
+/**
+ Changed object
+ */
+@property (nonatomic, strong, readonly) NSManagedObject *object;
+/**
+ The type of change (update, insert, delete, or move)
+ */
+@property (nonatomic, assign, readonly) MRTFetchedResultsChangeType type;
+/**
+ The original index of the object. If the object was inserted and did not exist previously, this will be NSNotFound
+ */
+@property (nonatomic, assign, readonly) NSUInteger index;
+/**
+ The new index of the object. If the object was deleted, the newIndex will be NSNotFound.
+ */
+@property (nonatomic, assign, readonly) NSUInteger newIndex;
 
 @end

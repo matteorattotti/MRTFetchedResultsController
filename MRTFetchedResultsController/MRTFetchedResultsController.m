@@ -11,11 +11,29 @@
 const NSString *SFNewContainerKey = @"SFNewContainerKey";
 
 struct MRTFetchedResultsControllerDelegateHasMethods {
-    BOOL delegateHasWillChangeContent;
-    BOOL delegateHasDidChangeContent;
-    BOOL delegateHasDidChangeObject;
-    BOOL delegateHasDidChangeObjectWithProgressiveChanges;
+    BOOL delegateHasWillBeginChanging;
+    BOOL delegateHasDidChangeWithChanges;
+    BOOL delegateHasDidChangeWithProgressiveChanges;
+    BOOL delegateHasDidEndChanging;
+    BOOL delegateHasDidEndChangingWithChanges;
+    BOOL delegateHasDidEndChangingWithProgressiveChanges;
 };
+
+@interface MRTFetchedResultsControllerChange ()
+
+@property (nonatomic, strong, readwrite) NSManagedObject *object;
+@property (nonatomic, assign, readwrite) MRTFetchedResultsChangeType type;
+@property (nonatomic, assign, readwrite) NSUInteger index;
+@property (nonatomic, assign, readwrite) NSUInteger newIndex;
+
+@property (nonatomic, assign) NSUInteger computedHash;
+
+- (instancetype)initWithObject:(id)anObject
+                         index:(NSUInteger)index
+                      newIndex:(NSUInteger)newIndex
+                          type:(MRTFetchedResultsChangeType)type;
+
+@end
 
 @interface MRTFetchedResultsController ()
 {
@@ -32,6 +50,9 @@ struct MRTFetchedResultsControllerDelegateHasMethods {
 @property (nonatomic, retain) NSArray *arrangedObjects;
 
 @property (nonatomic) struct MRTFetchedResultsControllerDelegateHasMethods delegateHas;
+
+@property (nonatomic, strong) NSMutableArray <MRTFetchedResultsControllerChange *> *currentBatchChanges;
+@property (nonatomic, strong) NSMutableArray <MRTFetchedResultsControllerChange *> *currentBatchProgressiveChanges;
 
 @end
 
@@ -145,10 +166,12 @@ struct MRTFetchedResultsControllerDelegateHasMethods {
 - (void)setDelegate:(id<MRTFetchedResultsControllerDelegate>)delegate
 {
     _delegate = delegate;
-    _delegateHas.delegateHasWillChangeContent = [_delegate respondsToSelector:@selector(controllerWillChangeContent:)];
-    _delegateHas.delegateHasDidChangeContent  = [_delegate respondsToSelector:@selector(controllerDidChangeContent:)];
-    _delegateHas.delegateHasDidChangeObject   = [_delegate respondsToSelector:@selector(controller:didChangeObject:atIndex:forChangeType:newIndex:)];
-    _delegateHas.delegateHasDidChangeObjectWithProgressiveChanges = [_delegate respondsToSelector:@selector(controller:didChangeObject:atIndex:progressiveIndex:forChangeType:forProgressiveChangeType:newIndex:newProgressiveIndex:)];
+    _delegateHas.delegateHasWillBeginChanging = [_delegate respondsToSelector:@selector(fetchedResultsControllerWillBeginChanging:)];
+    _delegateHas.delegateHasDidChangeWithChanges = [_delegate respondsToSelector:@selector(fetchedResultsController:didChange:)];
+    _delegateHas.delegateHasDidChangeWithProgressiveChanges = [_delegate respondsToSelector:@selector(fetchedResultsController:didChange:progressiveChange:)];
+    _delegateHas.delegateHasDidEndChanging = [_delegate respondsToSelector:@selector(fetchedResultsControllerDidEndChanging:)];
+    _delegateHas.delegateHasDidEndChangingWithChanges = [_delegate respondsToSelector:@selector(fetchedResultsController:didEndChanging:)];
+    _delegateHas.delegateHasDidEndChangingWithProgressiveChanges = [_delegate respondsToSelector:@selector(fetchedResultsController:didEndChanging:progressiveChanges:)];
 }
 
 - (void)setSortDescriptors:(NSArray *)sortDescriptors
@@ -436,15 +459,24 @@ struct MRTFetchedResultsControllerDelegateHasMethods {
 
 - (void)delegateWillChangeContent
 {
-    if (self.delegateHas.delegateHasWillChangeContent) {
-        [self.delegate controllerWillChangeContent:self];
+    if (self.delegateHas.delegateHasWillBeginChanging) {
+        [self.delegate fetchedResultsControllerWillBeginChanging:self];
     }
 }
 
 - (void)delegateDidChangeContent
 {
-    if (self.delegateHas.delegateHasDidChangeContent) {
-        [self.delegate controllerDidChangeContent:self];
+    if (self.delegateHas.delegateHasDidEndChangingWithProgressiveChanges) {
+        [self.delegate fetchedResultsController:self
+                                 didEndChanging:self.currentBatchChanges
+                             progressiveChanges:self.currentBatchProgressiveChanges];
+    }
+    else if (self.delegateHas.delegateHasDidEndChangingWithChanges) {
+        [self.delegate fetchedResultsController:self
+                                 didEndChanging:self.currentBatchChanges];
+    }
+    else if (self.delegateHas.delegateHasDidEndChanging) {
+        [self.delegate fetchedResultsControllerDidEndChanging:self];
     }
 }
 
@@ -457,19 +489,35 @@ struct MRTFetchedResultsControllerDelegateHasMethods {
             newProgressiveIndex:(NSUInteger)newProgressiveIndex
 {
     // NSLog(@"Changing object: %@\nAt index: %lu\nChange type: %d\nNew index: %lu", anObject, index, (int)type, newIndex);
-    
-    if (self.delegateHas.delegateHasDidChangeObjectWithProgressiveChanges) {
-        [self.delegate controller:self
-                  didChangeObject:anObject
-                          atIndex:index
-                 progressiveIndex:progressiveIndex
-                    forChangeType:changeType
-         forProgressiveChangeType:progressiveChangeType
-                         newIndex:newIndex
-              newProgressiveIndex:newProgressiveIndex];
+    MRTFetchedResultsControllerChange *change = [[MRTFetchedResultsControllerChange alloc] initWithObject:anObject
+                                                                                                    index:index
+                                                                                                 newIndex:newIndex
+                                                                                                     type:changeType];
+    MRTFetchedResultsControllerChange *pChange = nil;
+    if (self.delegateHas.delegateHasDidChangeWithProgressiveChanges || self.delegateHas.delegateHasDidEndChangingWithProgressiveChanges) {
+        pChange = [[MRTFetchedResultsControllerChange alloc] initWithObject:anObject
+                                                                      index:progressiveIndex
+                                                                   newIndex:newProgressiveIndex
+                                                                       type:progressiveChangeType];
     }
-    else if (self.delegateHas.delegateHasDidChangeObject) {
-        [self.delegate controller:self didChangeObject:anObject atIndex:index forChangeType:changeType newIndex:newIndex];
+    
+    // saving the changes for the didChangeContent callbacks if needed
+    if (self.delegateHas.delegateHasDidEndChangingWithChanges || self.delegateHas.delegateHasDidEndChangingWithProgressiveChanges) {
+        [self.currentBatchChanges addObject:change];
+    }
+    if (self.delegateHas.delegateHasDidEndChangingWithProgressiveChanges) {
+        [self.currentBatchProgressiveChanges addObject:pChange];
+    }
+    
+    // calling the delegate callbacks
+    if (self.delegateHas.delegateHasDidChangeWithProgressiveChanges) {
+        [self.delegate fetchedResultsController:self
+                                      didChange:change
+                              progressiveChange:pChange];
+    }
+    else if (self.delegateHas.delegateHasDidChangeWithChanges) {
+        [self.delegate fetchedResultsController:self
+                                      didChange:change];
     }
 }
 
@@ -482,10 +530,16 @@ struct MRTFetchedResultsControllerDelegateHasMethods {
     // Tmp array used to keep track of middle states
     NSMutableArray *progressiveArray = [oldContainer mutableCopy];
     
-    BOOL wantProgressiveChanges = self.delegateHas.delegateHasDidChangeObjectWithProgressiveChanges;
+    BOOL wantProgressiveChanges = self.delegateHas.delegateHasDidChangeWithProgressiveChanges || self.delegateHas.delegateHasDidEndChangingWithProgressiveChanges;
     
     NSMutableIndexSet *deletedIndexes = [NSMutableIndexSet indexSet];
     NSMutableIndexSet *insertedIndexes = [NSMutableIndexSet indexSet];
+    
+    // used to keep track of the changes we are making to be able to return them
+    // in the didChangeContent callbacks; these are populated in
+    // -delegateDidChangeObject:atIndex:progressiveIndex:changeType:progressiveChangeType:newIndex:newProgressiveIndex:
+    self.currentBatchChanges = [NSMutableArray array];
+    self.currentBatchProgressiveChanges = [NSMutableArray array];
     
     // DELETED
     for (id obj in deletedObjects) {
@@ -591,5 +645,71 @@ struct MRTFetchedResultsControllerDelegateHasMethods {
     }
 }
 
+
+@end
+
+@implementation MRTFetchedResultsControllerChange
+
+- (instancetype)initWithObject:(id)anObject
+                         index:(NSUInteger)index
+                      newIndex:(NSUInteger)newIndex
+                          type:(MRTFetchedResultsChangeType)type
+{
+    self = [super init];
+    if (self) {
+        self.object = anObject;
+        self.index = index;
+        self.newIndex = newIndex;
+        self.type = type;
+    }
+    return self;
+}
+
+- (BOOL)isEqual:(id)object
+{
+    if (object == self) { return YES; };
+    if (!object || ![object isKindOfClass:[self class]]) { return NO; };
+     
+    MRTFetchedResultsControllerChange *typedChange = (MRTFetchedResultsControllerChange *)object;
+    return self.object == typedChange.object &&
+           self.index == typedChange.index &&
+           self.newIndex == typedChange.newIndex &&
+           self.type == typedChange.type;
+}
+
+- (NSString *)typeDescription
+{
+    switch (self.type)
+    {
+        case MRTFetchedResultsChangeInsert:
+            return @"insert";
+            break;
+        case MRTFetchedResultsChangeDelete:
+            return @"delete";
+            break;
+        case MRTFetchedResultsChangeMove:
+            return @"move";
+            break;
+        case MRTFetchedResultsChangeUpdate:
+            return @"update";
+            break;
+    }
+    return @"undefined";
+}
+
+- (NSUInteger)hash
+{
+    if (_computedHash == 0) {
+        _computedHash = [[NSString stringWithFormat:@"%lu-%lu-%lu-%lu", [self.object hash], self.index, self.newIndex, self.type] hash];
+    }
+    
+    return _computedHash;
+}
+
+
+- (NSString *)description
+{
+    return [NSString stringWithFormat:@"%@ change with index: %lu newIndex: %lu", [self.typeDescription uppercaseString], self.index, self.newIndex];
+}
 
 @end

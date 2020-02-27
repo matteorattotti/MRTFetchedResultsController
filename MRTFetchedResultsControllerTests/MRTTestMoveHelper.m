@@ -92,11 +92,11 @@
 
 #pragma mark - MRTFetchedResultsControllerDelegate
 
-- (void)controllerWillChangeContent:(MRTFetchedResultsController *)controller
+- (void)fetchedResultsControllerWillBeginChanging:(MRTFetchedResultsController *)controller
 {
 }
 
-- (void)controllerDidChangeContent:(MRTFetchedResultsController *)controller
+- (void)fetchedResultsControllerDidEndChanging:(MRTFetchedResultsController *)controller
 {
     [self.didChangeContentExpectation fulfill];
 }
