@@ -101,7 +101,7 @@ typedef NSUInteger MRTFetchedResultsChangeType;
  @param anObject The object that was updated, deleted, inserted, or moved
  @param index The original index of the object. If the object was inserted and did not exist previously, this will be NSNotFound
  @param progressiveIndex the original index corrected keeping in consideration the previous change in the same batch (Usefull for keeping another array in sync, or for macOS NSTableView as it does't batch changes like on iOS
- @param type The type of change (update, insert, delete, or move)
+ @param progressiveChangeType The type of change (update, insert, delete, or move)
  @param newIndex The new index of the object. If the object was deleted, the newIndex will be NSNotFound.
  @param newProgressiveIndex new index of the object keeping in consideration the previous change in the same batch.
  */
@@ -113,5 +113,13 @@ typedef NSUInteger MRTFetchedResultsChangeType;
 forProgressiveChangeType:(MRTFetchedResultsChangeType)progressiveChangeType
           newIndex:(NSUInteger)newIndex
 newProgressiveIndex:(NSUInteger) newProgressiveIndex;
+
+
+/// Called every time a NSManagedObjectContextObjectsDidChangeNotification is posted, it allows to add more objects to the notification.
+/// This can be used to trigger updates to objects that are not directly modified in the NSManagedObjectContextObjectsDidChangeNotification (eg: objects inside relationship, etc...)
+/// @param changes The actual changed objects in the NSManagedObjectContext
+/// @return a dictionary of new changes using the same keys inside the passed `changes`
+- (NSDictionary *)additionalObjectsChangesForChanges:(NSDictionary <NSString *, NSSet *> *)changes;
+
 
 @end

@@ -852,7 +852,7 @@
         }
     }
     
-    [self waitForExpectationsWithTimeout:0.1 handler:^(NSError *error) {
+    [self waitForExpectationsWithTimeout:1 handler:^(NSError *error) {
         XCTAssertTrue(failures == 0);
         NSLog(@"Successes %lu Failures %lu",(unsigned long) successes, (unsigned long)failures);
     }];

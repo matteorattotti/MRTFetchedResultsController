@@ -10,11 +10,26 @@
 
 const NSString *SFNewContainerKey = @"SFNewContainerKey";
 
+
+@interface MRTChange : NSObject
+
+@property (assign) NSUInteger index;
+@property (assign) NSUInteger newIndex;
+@property (assign) NSUInteger progressiveIndex;
+@property (assign) MRTFetchedResultsChangeType type;
+@property (assign) NSUInteger computedHash;
+@property (assign) id object;
+
++ (MRTChange *)changeWithType:(NSUInteger)type object:(id)object index:(NSUInteger)index newIndex:(NSUInteger)newIndex progressiveIndex:(NSUInteger)progressiveIndex;
+
+@end
+
 struct MRTFetchedResultsControllerDelegateHasMethods {
     BOOL delegateHasWillChangeContent;
     BOOL delegateHasDidChangeContent;
     BOOL delegateHasDidChangeObject;
     BOOL delegateHasDidChangeObjectWithProgressiveChanges;
+    BOOL delegateHasAdditionalObjectsChangesChanges;
 };
 
 @interface MRTFetchedResultsController ()
@@ -109,7 +124,6 @@ struct MRTFetchedResultsControllerDelegateHasMethods {
     
     if (success) {
         // Arranging objects
-        //[self updateArrangedObjects];
         [self filterArrangedObjects];
         [self sortArrangedObjects];
         
@@ -149,6 +163,7 @@ struct MRTFetchedResultsControllerDelegateHasMethods {
     _delegateHas.delegateHasDidChangeContent  = [_delegate respondsToSelector:@selector(controllerDidChangeContent:)];
     _delegateHas.delegateHasDidChangeObject   = [_delegate respondsToSelector:@selector(controller:didChangeObject:atIndex:forChangeType:newIndex:)];
     _delegateHas.delegateHasDidChangeObjectWithProgressiveChanges = [_delegate respondsToSelector:@selector(controller:didChangeObject:atIndex:progressiveIndex:forChangeType:forProgressiveChangeType:newIndex:newProgressiveIndex:)];
+    _delegateHas.delegateHasAdditionalObjectsChangesChanges = [_delegate respondsToSelector:@selector(additionalObjectsChangesForChanges:)];
 }
 
 - (void)setSortDescriptors:(NSArray *)sortDescriptors
@@ -252,29 +267,32 @@ struct MRTFetchedResultsControllerDelegateHasMethods {
 - (void)managedObjectContextObjectsDidChange:(NSNotification*)notification
 {
     if (!self.fetchRequest) { return; }
+    NSDictionary *changes = [self changesFromManagedObjectContextObjectsDidChange:notification];
     
     // Array are way faster to enumerate than sets
-    NSArray *insertedObjects = [[notification.userInfo valueForKey:NSInsertedObjectsKey] allObjects];
-    NSArray *deletedObjects = [[notification.userInfo valueForKey:NSDeletedObjectsKey] allObjects];
-    NSArray *updatedObjects = [[notification.userInfo valueForKey:NSUpdatedObjectsKey] allObjects];
+    NSArray *insertedObjects = [[changes valueForKey:NSInsertedObjectsKey] allObjects];
+    NSArray *deletedObjects = [[changes valueForKey:NSDeletedObjectsKey] allObjects];
+    NSArray *updatedObjects = [[changes valueForKey:NSUpdatedObjectsKey] allObjects];
+    NSSet *refreshedObjectsSet = [changes valueForKey:NSRefreshedObjectsKey];
     
-    NSMutableSet *refreshedObjectsSet = [[notification.userInfo valueForKey:NSRefreshedObjectsKey] mutableCopy];
-    [refreshedObjectsSet minusSet:[notification.userInfo valueForKey:NSInsertedObjectsKey]];
-    [refreshedObjectsSet minusSet:[notification.userInfo valueForKey:NSDeletedObjectsKey]];
-    [refreshedObjectsSet minusSet:[notification.userInfo valueForKey:NSUpdatedObjectsKey]];
+    NSMutableSet *updatedAndRefreshedObject = [NSMutableSet set];
+    if (updatedObjects) { [updatedAndRefreshedObject addObjectsFromArray:updatedObjects]; }
+    if (refreshedObjectsSet) { [updatedAndRefreshedObject unionSet:refreshedObjectsSet]; }
+    [updatedAndRefreshedObject minusSet:[changes valueForKey:NSInsertedObjectsKey]];
+    [updatedAndRefreshedObject minusSet:[changes valueForKey:NSDeletedObjectsKey]];
     
-    NSArray *updatedAndRefreshedObject = updatedObjects ? [updatedObjects arrayByAddingObjectsFromArray:refreshedObjectsSet.allObjects] : refreshedObjectsSet.allObjects;
-
+    updatedObjects = updatedAndRefreshedObject.allObjects;
     
     BOOL notifyDelegateForFetchedObjects = YES;
-
+    BOOL notifyDelegateDidChangeContent = NO;
+    
     // Evaluating for arrangedObjects
     if (_arrangedObjects) {
         notifyDelegateForFetchedObjects = NO;
 
         NSDictionary *results = [self evaluateDeletedObjects:deletedObjects
                                              insertedObjects:insertedObjects
-                                              updatedObjects:updatedAndRefreshedObject
+                                              updatedObjects:updatedObjects
                                                  inContainer:_arrangedObjects
                                                 fetchRequest:_arrangedObjectInMemoryFetchRequest];
         
@@ -292,7 +310,7 @@ struct MRTFetchedResultsControllerDelegateHasMethods {
                                insertedObjects:results[NSInsertedObjectsKey]
                                 updatedObjects:results[NSUpdatedObjectsKey]];
 
-            [self delegateDidChangeContent];
+            notifyDelegateDidChangeContent = YES;
         }
 
     }
@@ -300,7 +318,7 @@ struct MRTFetchedResultsControllerDelegateHasMethods {
     // Evaluating for fetchedObjects
     NSDictionary *results = [self evaluateDeletedObjects:deletedObjects
                                          insertedObjects:insertedObjects
-                                          updatedObjects:updatedAndRefreshedObject
+                                          updatedObjects:updatedObjects
                                              inContainer:_fetchedObjects
                                             fetchRequest:self.fetchRequest];
     
@@ -320,12 +338,16 @@ struct MRTFetchedResultsControllerDelegateHasMethods {
                                insertedObjects:results[NSInsertedObjectsKey]
                                 updatedObjects:results[NSUpdatedObjectsKey]];
             
-            [self delegateDidChangeContent];
+            notifyDelegateDidChangeContent = YES;
         }
         else {
             _fetchedObjects = newContainer;
         }
         
+    }
+    
+    if(notifyDelegateDidChangeContent) {
+        [self delegateDidChangeContent];
     }
 }
 
@@ -361,8 +383,14 @@ struct MRTFetchedResultsControllerDelegateHasMethods {
             continue;
         }
         
-        [newContainer addObject:insertedObj];
-        [containerInsertedObjects addObject:insertedObj];
+        // Already inside the container (updated)
+        if ([container containsObject:insertedObj]) {
+            [containerUpdatedObjects addObject:insertedObj];
+        }
+        else {
+            [newContainer addObject:insertedObj];
+            [containerInsertedObjects addObject:insertedObj];
+        }
     }
 
     // UPDATED objects (after the update they can be inserted/deleted/updated/moved in the container)
@@ -431,6 +459,31 @@ struct MRTFetchedResultsControllerDelegateHasMethods {
     return YES;
 }
 
+- (NSDictionary <NSString *, NSSet *> *)changesFromManagedObjectContextObjectsDidChange:(NSNotification*)notification {
+    NSMutableDictionary *changes = [notification.userInfo mutableCopy];
+    if(self.delegateHas.delegateHasAdditionalObjectsChangesChanges) {
+        NSDictionary *additionalChanges = [self.delegate additionalObjectsChangesForChanges:@{NSInsertedObjectsKey: [changes valueForKey:NSInsertedObjectsKey] ?: [NSSet set],
+                                                                                              NSDeletedObjectsKey: [changes valueForKey:NSDeletedObjectsKey] ?: [NSSet set],
+                                                                                              NSUpdatedObjectsKey: [changes valueForKey:NSUpdatedObjectsKey] ?: [NSSet set],
+                                                                                              NSRefreshedObjectsKey: [changes valueForKey:NSRefreshedObjectsKey] ?: [NSSet set],
+                                                                                            }];
+
+        for(NSString *key in @[NSInsertedObjectsKey, NSDeletedObjectsKey, NSUpdatedObjectsKey, NSRefreshedObjectsKey]) {
+            NSMutableSet *mergedObjects = [NSMutableSet set];
+            if(additionalChanges[key]) {
+                [mergedObjects unionSet:additionalChanges[key]];
+            }
+            if(changes[key]) {
+                [mergedObjects unionSet:changes[key]];
+            }
+            if(mergedObjects.count) {
+                changes[key] = mergedObjects;
+            }
+        }
+    }
+
+    return changes;
+}
 
 #pragma mark - Notifications
 
@@ -482,17 +535,43 @@ struct MRTFetchedResultsControllerDelegateHasMethods {
     // Tmp array used to keep track of middle states
     NSMutableArray *progressiveArray = [oldContainer mutableCopy];
     
-    BOOL wantProgressiveChanges = self.delegateHas.delegateHasDidChangeObjectWithProgressiveChanges;
+    NSMutableArray *insertedUpdated = [NSMutableArray array];
+    NSMutableArray *deleted = [NSMutableArray array];
     
-    NSMutableIndexSet *deletedIndexes = [NSMutableIndexSet indexSet];
-    NSMutableIndexSet *insertedIndexes = [NSMutableIndexSet indexSet];
-    
-    // DELETED
-    for (id obj in deletedObjects) {
+    for(id obj in deletedObjects) {
         NSUInteger index = [oldContainer indexOfObjectIdenticalTo:obj];
-        NSUInteger progressiveIndex = [progressiveArray indexOfObjectIdenticalTo:obj];
-        
-        [deletedIndexes addIndex:index];
+        MRTChange *c = [MRTChange changeWithType:MRTFetchedResultsChangeDelete object:obj index:index newIndex:NSNotFound progressiveIndex:index];
+        [deleted addObject:c];
+    }
+
+    for(id obj in insertedObjects) {
+        NSUInteger newIndex = [newContainer indexOfObjectIdenticalTo:obj];
+        MRTChange *c = [MRTChange changeWithType:MRTFetchedResultsChangeInsert object:obj index:NSNotFound newIndex:newIndex progressiveIndex:NSNotFound];
+        [insertedUpdated addObject:c];
+    }
+    
+    for(id obj in updatedObjects) {
+        NSUInteger index = [oldContainer indexOfObjectIdenticalTo:obj];
+        NSUInteger newIndex = [newContainer indexOfObjectIdenticalTo:obj];
+        if(index != newIndex) {
+            MRTChange *c = [MRTChange changeWithType:MRTFetchedResultsChangeMove object:obj index:index newIndex:newIndex progressiveIndex:NSNotFound];
+            [insertedUpdated addObject:c];
+        }
+        else {
+            MRTChange *c = [MRTChange changeWithType:MRTFetchedResultsChangeUpdate object:obj index:index newIndex:newIndex progressiveIndex:index];
+            [insertedUpdated addObject:c];
+        }
+    }
+    
+    [insertedUpdated sortUsingDescriptors:@[[NSSortDescriptor sortDescriptorWithKey:@"newIndex" ascending:YES]]];
+    [deleted sortUsingDescriptors:@[[NSSortDescriptor sortDescriptorWithKey:@"index" ascending:NO]]];
+    
+    
+    // DELETE
+    for(MRTChange *change in deleted) {
+        NSUInteger index = change.index;
+        id obj = change.object;
+        NSUInteger progressiveIndex = change.index;
         
         [progressiveArray removeObjectAtIndex:progressiveIndex];
         
@@ -503,39 +582,34 @@ struct MRTFetchedResultsControllerDelegateHasMethods {
                 progressiveChangeType:MRTFetchedResultsChangeDelete
                              newIndex:NSNotFound
                   newProgressiveIndex:NSNotFound];
-
     }
     
-    // INSERTED
-    for (id obj in insertedObjects) {
-        NSUInteger newIndex = [newContainer indexOfObjectIdenticalTo:obj];
-        [progressiveArray insertObject:obj atIndex:newIndex];
-        
-        [insertedIndexes addIndex:newIndex];
-        
-        [self delegateDidChangeObject:obj
-                              atIndex:NSNotFound
-                     progressiveIndex:NSNotFound
-                           changeType:MRTFetchedResultsChangeInsert
-                progressiveChangeType:MRTFetchedResultsChangeInsert
-                             newIndex:newIndex
-                  newProgressiveIndex:newIndex];
-
-    }
-    
-    // UPDATED OR MOVED
+    // INSERTED / MOVED / UPDATED
     NSInteger previousSegmentLocation = -1;
     NSInteger previousInsert = -1;
 
-    for (id obj in updatedObjects) {
-    
-        __block NSUInteger index = [oldContainer indexOfObjectIdenticalTo:obj];
-        __block NSUInteger newIndex = [newContainer indexOfObjectIdenticalTo:obj];
-        __block NSUInteger progressiveIndex = [progressiveArray indexOfObjectIdenticalTo:obj];
-        __block NSUInteger newProgressiveIndex = newIndex;
+    for(MRTChange *change in insertedUpdated) {
+        NSUInteger newIndex = change.newIndex;
+        NSUInteger index = change.index;
+        id obj = change.object;
+        
+        // INSERTED
+        if(change.type == MRTFetchedResultsChangeInsert) {
+            [progressiveArray insertObject:obj atIndex:newIndex];
 
-        // Offsetting newProgressiveIndex for delegate who want the progressive changes
-        if (wantProgressiveChanges) {
+            [self delegateDidChangeObject:obj
+                                  atIndex:NSNotFound
+                         progressiveIndex:NSNotFound
+                               changeType:MRTFetchedResultsChangeInsert
+                    progressiveChangeType:MRTFetchedResultsChangeInsert
+                                 newIndex:newIndex
+                      newProgressiveIndex:newIndex];
+        }
+        // MOVED
+        else {
+            NSUInteger progressiveIndex = [progressiveArray indexOfObjectIdenticalTo:obj];
+            NSUInteger newProgressiveIndex = newIndex;
+
             // First object and it's moving to the top if the array, no offset needed
             if (previousSegmentLocation == -1 && newIndex == 0) {
             }
@@ -546,9 +620,9 @@ struct MRTFetchedResultsControllerDelegateHasMethods {
             // Found a gap, finding the previous object in the final array and inserting next to it to pass the gap
             else {
                 // Still haven't found why this happens...
-                if (newIndex == 0 || newIndex == NSNotFound) {
+                /*if (newIndex == 0 || newIndex == NSNotFound) {
                     continue;
-                }
+                }*/
                 newProgressiveIndex = [progressiveArray indexOfObjectIdenticalTo:[newContainer objectAtIndex:newIndex-1]] +1;
             }
             
@@ -559,36 +633,67 @@ struct MRTFetchedResultsControllerDelegateHasMethods {
 
             previousSegmentLocation = newIndex;
             previousInsert = newProgressiveIndex;
-        }
-        
-        // Checking if the change is an update or a move
-        MRTFetchedResultsChangeType changeType = (index == newIndex) ? MRTFetchedResultsChangeUpdate : MRTFetchedResultsChangeMove;
-        MRTFetchedResultsChangeType progressiveChangeType = (progressiveIndex == newProgressiveIndex) ? MRTFetchedResultsChangeUpdate : MRTFetchedResultsChangeMove;
-        
-        // There is a special case where we still need to mark an update as a move (just to maintain the compatibility with NSFetchedResultsController)
-        // Check "testUpdateThatActuallyIsAMove" to understand this :)
-        if (changeType == MRTFetchedResultsChangeUpdate) {
-            NSUInteger deletions = [deletedIndexes countOfIndexesInRange:NSMakeRange(0, index)];
-            NSUInteger insertions = [insertedIndexes countOfIndexesInRange:NSMakeRange(0, index)];
             
-            if (deletions != insertions) {
-                changeType = MRTFetchedResultsChangeMove;
+            MRTFetchedResultsChangeType changeType = (index == newIndex) ? MRTFetchedResultsChangeUpdate : MRTFetchedResultsChangeMove;
+            MRTFetchedResultsChangeType progressiveChangeType = (progressiveIndex == newProgressiveIndex) ? MRTFetchedResultsChangeUpdate : MRTFetchedResultsChangeMove;
+
+            if (changeType == MRTFetchedResultsChangeMove || progressiveChangeType == MRTFetchedResultsChangeMove) {
+                [progressiveArray removeObjectAtIndex:progressiveIndex];
+                [progressiveArray insertObject:obj atIndex:newProgressiveIndex];
             }
-        }
-        
-        [self delegateDidChangeObject:obj
-                              atIndex:index
-                     progressiveIndex:progressiveIndex
-                           changeType:changeType
-                progressiveChangeType:progressiveChangeType
-                             newIndex:newIndex
-                  newProgressiveIndex:newProgressiveIndex];
-        
-        if (changeType == MRTFetchedResultsChangeMove || progressiveChangeType == MRTFetchedResultsChangeMove) {
-            [progressiveArray removeObjectAtIndex:progressiveIndex];
-            [progressiveArray insertObject:obj atIndex:newProgressiveIndex];
+
+            [self delegateDidChangeObject:obj
+                                  atIndex:index
+                         progressiveIndex:progressiveIndex
+                               changeType:changeType
+                    progressiveChangeType:progressiveChangeType
+                                 newIndex:newIndex
+                      newProgressiveIndex:newProgressiveIndex];
         }
     }
+}
+
+
+@end
+
+
+@implementation MRTChange
+
++ (MRTChange *)changeWithType:(NSUInteger)type object:(id)object index:(NSUInteger)index newIndex:(NSUInteger)newIndex progressiveIndex:(NSUInteger)progressiveIndex
+{
+    MRTChange *change = [MRTChange new];
+    change.type = type;
+    change.index = index;
+    change.newIndex = newIndex;
+    change.progressiveIndex = progressiveIndex;
+    change.object = object;
+    
+    return change;
+}
+
+- (BOOL)isEqual:(id)object
+{
+    if (object == self) { return YES; };
+    if (!object || ![object isKindOfClass:[self class]]) { return NO; };
+     
+    return self.index == [object index] &&
+           self.newIndex == [object newIndex] &&
+           self.type == [(MRTChange *)object type];
+}
+
+- (NSUInteger)hash
+{
+    if (_computedHash == 0) {
+        _computedHash = [[NSString stringWithFormat:@"%lu-%lu-%lu", self.index, self.newIndex, self.type] hash];
+    }
+    
+    return _computedHash;
+}
+
+
+- (NSString *)description
+{
+    return [NSString stringWithFormat:@"Type: %lu index: %lu newIndex: %lu", self.type, self.index, self.newIndex];
 }
 
 

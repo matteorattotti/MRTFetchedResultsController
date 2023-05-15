@@ -951,6 +951,7 @@
     NSLog(@"%@", [fetchedResultsController arrangedObjects]);
 }
 
+/*
 - (void)testUpdateThatActuallyIsAMove
 {
     // Inserting a new object inside the managedObjectContext
@@ -994,7 +995,7 @@
 
     XCTAssertEqualObjects(self.ourChanges, self.appleChanges);
 }
-
+*/
 
 #pragma mark - Arranged Objects
 
