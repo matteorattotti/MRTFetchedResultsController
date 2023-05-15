@@ -1132,6 +1132,57 @@
     }];
 }
 
+- (void)testInsertCrossedByMove
+{
+    // Test created after this bug: https://tinyurl.com/bdybj6h6
+    // What happened was that in the previous version of the MRTFetchedResultsController
+    // the `insert`s were applied before the `update`s, so if a `move` changed the indices
+    // before the insert--that lead to a wrong final state
+    // What is expected:
+    // 0, 1, 2, 3    ->    3, 0, 1, AFTER-1, 2
+    
+    // Inserting a new object inside the managedObjectContext
+    Note *newObject0 = [NSEntityDescription insertNewObjectForEntityForName:@"Note" inManagedObjectContext:self.managedObjectContext];
+    newObject0.order = @10;
+    newObject0.text = @"0";
+    
+    // Inserting a new object inside the managedObjectContext
+    Note *newObject1 = [NSEntityDescription insertNewObjectForEntityForName:@"Note" inManagedObjectContext:self.managedObjectContext];
+    newObject1.order = @11;
+    newObject1.text = @"1";
+    
+    // Inserting a new object inside the managedObjectContext
+    Note *newObject2 = [NSEntityDescription insertNewObjectForEntityForName:@"Note" inManagedObjectContext:self.managedObjectContext];
+    newObject2.order = @20;
+    newObject2.text = @"2";
+    
+    // Inserting a new object inside the managedObjectContext
+    Note *newObject3 = [NSEntityDescription insertNewObjectForEntityForName:@"Note" inManagedObjectContext:self.managedObjectContext];
+    newObject3.order = @21;
+    newObject3.text = @"3";
+    
+    // Creating the fetchedResultsController
+    MRTFetchedResultsController *fetchedResultsController = [self notesFetchedResultsController];
+    [fetchedResultsController performFetch:nil];
+    [self.targetArray addObjectsFromArray:@[newObject0, newObject1, newObject2, newObject3]];
+    
+    newObject3.order =  @0;
+    Note *newObject4 = [NSEntityDescription insertNewObjectForEntityForName:@"Note" inManagedObjectContext:self.managedObjectContext];
+    newObject4.order = @12;
+    newObject4.text = @"AFTER-1";
+    
+    // Waiting for the did change expectation
+    [self waitForExpectationsWithTimeout:self.expectationsDefaultTimeout handler:^(NSError *error) {
+        if(error) XCTFail(@"Expectation Failed with error: %@", error);
+        [fetchedResultsController.arrangedObjects enumerateObjectsUsingBlock:^(Note *obj, NSUInteger idx, BOOL * _Nonnull stop) {
+            Note *noteB = self.targetArray[idx];
+            if (obj != noteB) {
+                NSLog(@" !!! Note at index %ld with title `%@` should be equal to note with title `%@`", idx, obj.text, noteB.text);
+            }
+        }];
+        XCTAssertTrue([fetchedResultsController.arrangedObjects isEqualToArray:self.targetArray]);
+    }];
+}
 
 #pragma mark - MRTFetchedResultsControllerDelegate
 
