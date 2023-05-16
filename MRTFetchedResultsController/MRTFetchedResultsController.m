@@ -355,10 +355,10 @@ struct MRTFetchedResultsControllerDelegateHasMethods {
 
 
 - (NSDictionary *) evaluateDeletedObjects: (NSArray *) deletedObjects
-                            insertedObjects: (NSArray *) insertedObjects
-                             updatedObjects: (NSArray *) updatedObjects
-                                inContainer: (NSMutableArray *) container
-                               fetchRequest: (NSFetchRequest *) fetchRequest
+                          insertedObjects: (NSArray *) insertedObjects
+                           updatedObjects: (NSArray *) updatedObjects
+                              inContainer: (NSMutableArray *) container
+                             fetchRequest: (NSFetchRequest *) fetchRequest
 {
     
     NSMutableArray *containerDeletedObjects = [NSMutableArray array];
@@ -367,12 +367,18 @@ struct MRTFetchedResultsControllerDelegateHasMethods {
     
     NSMutableArray *newContainer = [container mutableCopy];
     
+    NSMutableDictionary *containerIndexCache = [NSMutableDictionary new];
+    [container enumerateObjectsUsingBlock:^(NSManagedObject *obj, NSUInteger idx, BOOL * _Nonnull stop) {
+        containerIndexCache[[obj objectID]] = @(idx);
+    }];
+
     // DELETED objects
     for (NSManagedObject *deletedObj in deletedObjects) {
-        if (![container containsObject:deletedObj]) {
+        // The container doesn't have this object, skipping it
+        if(!containerIndexCache[deletedObj.objectID]) {
             continue;
         }
-
+        
         [newContainer removeObject:deletedObj];
         [containerDeletedObjects addObject:deletedObj];
     }
@@ -384,9 +390,10 @@ struct MRTFetchedResultsControllerDelegateHasMethods {
         }
         
         // Already inside the container (updated)
-        if ([container containsObject:insertedObj]) {
+        if(containerIndexCache[insertedObj.objectID]) {
             [containerUpdatedObjects addObject:insertedObj];
         }
+        // Not in the container (inserted)
         else {
             [newContainer addObject:insertedObj];
             [containerInsertedObjects addObject:insertedObj];
@@ -398,18 +405,16 @@ struct MRTFetchedResultsControllerDelegateHasMethods {
 
         // Object is inside the container, but no longer conform to the fetch request (deleted)
         if (![self object:updatedObj isConformToFetchRequest:fetchRequest]) {
-
-            if ([container containsObject:updatedObj]) {
+            if(containerIndexCache[updatedObj.objectID]) {
                 [newContainer removeObject:updatedObj];
                 [containerDeletedObjects addObject:updatedObj];
-                
             }            
         }
 
         // Object conform to the fetch request
         else {
             // Already inside the container (updated)
-            if ([container containsObject:updatedObj]) {
+            if(containerIndexCache[updatedObj.objectID]) {
                 [containerUpdatedObjects addObject:updatedObj];
             }
             // Not inside the container (inserted)
@@ -424,10 +429,6 @@ struct MRTFetchedResultsControllerDelegateHasMethods {
     NSArray *sortDescriptors = [fetchRequest sortDescriptors];
     if ([sortDescriptors count]) {
         [newContainer sortUsingDescriptors:sortDescriptors];
-        
-        [containerInsertedObjects sortUsingDescriptors:sortDescriptors];
-        [containerDeletedObjects sortUsingDescriptors:sortDescriptors];
-        [containerUpdatedObjects sortUsingDescriptors:sortDescriptors];
     }
     
     if ((containerDeletedObjects.count || containerUpdatedObjects.count || containerInsertedObjects.count)) {
@@ -538,21 +539,33 @@ struct MRTFetchedResultsControllerDelegateHasMethods {
     NSMutableArray *insertedUpdated = [NSMutableArray array];
     NSMutableArray *deleted = [NSMutableArray array];
     
-    for(id obj in deletedObjects) {
-        NSUInteger index = [oldContainer indexOfObjectIdenticalTo:obj];
+    // Building indexes cache
+    NSMutableDictionary *oldContainerIndexCache = [NSMutableDictionary new];
+    [oldContainer enumerateObjectsUsingBlock:^(NSManagedObject *obj, NSUInteger idx, BOOL * _Nonnull stop) {
+        oldContainerIndexCache[[obj objectID]] = @(idx);
+    }];
+    
+    NSMutableDictionary *newContainerIndexCache = [NSMutableDictionary new];
+    [newContainer enumerateObjectsUsingBlock:^(NSManagedObject *obj, NSUInteger idx, BOOL * _Nonnull stop) {
+        newContainerIndexCache[[obj objectID]] = @(idx);
+    }];
+
+    // Bulding changes objects
+    for(NSManagedObject *obj in deletedObjects) {
+        NSUInteger index = [oldContainerIndexCache[obj.objectID] unsignedIntValue];
         MRTChange *c = [MRTChange changeWithType:MRTFetchedResultsChangeDelete object:obj index:index newIndex:NSNotFound progressiveIndex:index];
         [deleted addObject:c];
     }
 
-    for(id obj in insertedObjects) {
-        NSUInteger newIndex = [newContainer indexOfObjectIdenticalTo:obj];
+    for(NSManagedObject *obj in insertedObjects) {
+        NSUInteger newIndex = [newContainerIndexCache[obj.objectID] unsignedIntValue];
         MRTChange *c = [MRTChange changeWithType:MRTFetchedResultsChangeInsert object:obj index:NSNotFound newIndex:newIndex progressiveIndex:NSNotFound];
         [insertedUpdated addObject:c];
     }
     
-    for(id obj in updatedObjects) {
-        NSUInteger index = [oldContainer indexOfObjectIdenticalTo:obj];
-        NSUInteger newIndex = [newContainer indexOfObjectIdenticalTo:obj];
+    for(NSManagedObject *obj in updatedObjects) {
+        NSUInteger index = [oldContainerIndexCache[obj.objectID] unsignedIntValue];
+        NSUInteger newIndex = [newContainerIndexCache[obj.objectID] unsignedIntValue];
         if(index != newIndex) {
             MRTChange *c = [MRTChange changeWithType:MRTFetchedResultsChangeMove object:obj index:index newIndex:newIndex progressiveIndex:NSNotFound];
             [insertedUpdated addObject:c];
@@ -563,6 +576,7 @@ struct MRTFetchedResultsControllerDelegateHasMethods {
         }
     }
     
+    // Sorting in a way that prevent indexes to change when applying the change
     [insertedUpdated sortUsingDescriptors:@[[NSSortDescriptor sortDescriptorWithKey:@"newIndex" ascending:YES]]];
     [deleted sortUsingDescriptors:@[[NSSortDescriptor sortDescriptorWithKey:@"index" ascending:NO]]];
     

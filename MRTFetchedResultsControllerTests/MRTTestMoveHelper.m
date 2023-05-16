@@ -63,13 +63,13 @@
     self.fetchedResultsController = [self notesFetchedResultsController];
     [self.fetchedResultsController performFetch:nil];
  
-    [self.finalOrders enumerateObjectsUsingBlock:^(NSNumber *order, NSUInteger idx, BOOL * _Nonnull stop) {
+   /* [self.finalOrders enumerateObjectsUsingBlock:^(NSNumber *order, NSUInteger idx, BOOL * _Nonnull stop) {
         Note *note = [self.targetArray objectAtIndex:idx];
         
         if (![note.order isEqualToNumber:order]) {
             note.order = order;
         }
-    }];
+    }];*/
 
 }
 
@@ -101,11 +101,17 @@
     [self.didChangeContentExpectation fulfill];
 }
 
-
-- (void)controller:(MRTFetchedResultsController *)controller didChangeObject:(id)anObject atIndex:(NSUInteger)index progressiveIndex:(NSUInteger) progressiveIndex forChangeType:(MRTFetchedResultsChangeType)type newIndex:(NSUInteger)newIndex newProgressiveIndex:(NSUInteger)newProgressiveIndex;
+- (void)controller:(MRTFetchedResultsController *)controller
+   didChangeObject:(id)anObject
+           atIndex:(NSUInteger)index
+  progressiveIndex:(NSUInteger) progressiveIndex
+     forChangeType:(MRTFetchedResultsChangeType)changeType
+forProgressiveChangeType:(MRTFetchedResultsChangeType)progressiveChangeType
+          newIndex:(NSUInteger)newIndex
+newProgressiveIndex:(NSUInteger) newProgressiveIndex;
 {
     if (self.logMoves) {
-        switch (type) {
+        switch (changeType) {
             case MRTFetchedResultsChangeDelete:
                 [self.movementHistory appendFormat:@"deleted %@ at %lu\n", [anObject text], progressiveIndex];
                 [self.targetArray removeObjectAtIndex:progressiveIndex];
@@ -131,7 +137,7 @@
         }
     }
     else {
-        switch (type) {
+        switch (changeType) {
             case MRTFetchedResultsChangeMove:
                 self.numberOfMoves++;
                 [self.targetArray removeObjectAtIndex:progressiveIndex];

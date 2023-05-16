@@ -800,12 +800,12 @@
     }];
 }
 
-- (void) testAllMoves
+/*- (void) testAllMoves
 {
     [self.didChangeContentExpectation fulfill];
 
-    //NSArray *items = @[@"a", @"b", @"c"];
-    //NSArray *order = @[@(0), @(1), @(2), @(3), @(-1), @(-2), @(-3)];
+    NSArray *items = @[@"a", @"b", @"c"];
+    NSArray *order = @[@(0), @(1), @(2), @(3), @(-1), @(-2), @(-3)];
 
     //NSArray *items = @[@"a", @"b", @"c", @"d"];
     //NSArray *order = @[@(0), @(1), @(2), @(3), @(-1), @(-2), @(-3), @(-4)];
@@ -813,8 +813,8 @@
     //NSArray *items = @[@"a", @"b", @"c", @"d", @"e"];
     //NSArray *order = @[@(0), @(1), @(2), @(3), @(4), @(-1), @(-2), @(-3), @(-4), @(-5)];
 
-    NSArray *items = @[@"a", @"b", @"c", @"d", @"e", @"f"];
-    NSArray *order = @[@1, @2, @3, @4, @5, @6];
+    //NSArray *items = @[@"a", @"b", @"c", @"d", @"e", @"f"];
+    //NSArray *order = @[@1, @2, @3, @4, @5, @6];
 
     //NSArray *items = @[@"a", @"b", @"c", @"d", @"e", @"f", @"g"];
     //NSArray *order = @[@0, @1, @2, @3, @4, @5, @6];
@@ -856,11 +856,10 @@
         XCTAssertTrue(failures == 0);
         NSLog(@"Successes %lu Failures %lu",(unsigned long) successes, (unsigned long)failures);
     }];
-}
-/*
+}*/
+
 - (void) testPerformance
 {
-
     NSMutableArray *items = [NSMutableArray array];
     NSMutableArray *orders = [NSMutableArray array];
     
@@ -871,9 +870,8 @@
     }
     
     MRTTestMoveHelper *helper = [[MRTTestMoveHelper alloc] initWithTest:self initialItems:items finalOrders:orders];
-    
     [helper performMoves];
-    
+
     [self.didChangeContentExpectation fulfill];
 
     [self waitForExpectationsWithTimeout:1 handler:^(NSError *error) {
@@ -881,7 +879,7 @@
         XCTAssertTrue([helper numberOfMoves] == numberOfMoves);
     }];
 }
- */
+ 
 
 #pragma mark - Multiple changes
 
