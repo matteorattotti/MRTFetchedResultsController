@@ -607,9 +607,32 @@ struct MRTFetchedResultsControllerDelegateHasMethods {
         NSUInteger index = change.index;
         id obj = change.object;
         
+        NSUInteger progressiveIndex = [progressiveArray indexOfObjectIdenticalTo:obj];
+        NSUInteger newProgressiveIndex = newIndex;
+
+        // First object and it's moving to the top if the array, no offset needed
+        if (newIndex == 0) {
+        }
+        // This object is adjacent to the previous one inserted, we can just add 1 to the index
+        else if (previousSegmentLocation == newIndex -1) {
+            newProgressiveIndex = previousInsert +1;
+        }
+        // Found a gap, finding the previous object in the final array and inserting next to it to pass the gap
+        else {
+            newProgressiveIndex = [progressiveArray indexOfObjectIdenticalTo:[newContainer objectAtIndex:newIndex-1]] +1;
+        }
+        
+        // Removing element from the top and moving it to the bottom requires adjusting the index by 1
+        if (progressiveIndex != NSNotFound && newProgressiveIndex > progressiveIndex) {
+            newProgressiveIndex--;
+        }
+
+        previousSegmentLocation = newIndex;
+        previousInsert = newProgressiveIndex;
+
         // INSERTED
         if(change.type == MRTFetchedResultsChangeInsert) {
-            [progressiveArray insertObject:obj atIndex:newIndex];
+            [progressiveArray insertObject:obj atIndex:newProgressiveIndex];
 
             [self delegateDidChangeObject:obj
                                   atIndex:NSNotFound
@@ -617,37 +640,10 @@ struct MRTFetchedResultsControllerDelegateHasMethods {
                                changeType:MRTFetchedResultsChangeInsert
                     progressiveChangeType:MRTFetchedResultsChangeInsert
                                  newIndex:newIndex
-                      newProgressiveIndex:newIndex];
+                      newProgressiveIndex:newProgressiveIndex];
         }
         // MOVED
         else {
-            NSUInteger progressiveIndex = [progressiveArray indexOfObjectIdenticalTo:obj];
-            NSUInteger newProgressiveIndex = newIndex;
-
-            // First object and it's moving to the top if the array, no offset needed
-            if (previousSegmentLocation == -1 && newIndex == 0) {
-            }
-            // This object is adjacent to the previous one inserted, we can just add 1 to the index
-            else if (previousSegmentLocation == newIndex -1) {
-                newProgressiveIndex = previousInsert +1;
-            }
-            // Found a gap, finding the previous object in the final array and inserting next to it to pass the gap
-            else {
-                // Still haven't found why this happens...
-                /*if (newIndex == 0 || newIndex == NSNotFound) {
-                    continue;
-                }*/
-                newProgressiveIndex = [progressiveArray indexOfObjectIdenticalTo:[newContainer objectAtIndex:newIndex-1]] +1;
-            }
-            
-            // Removing element from the top and moving it to the bottom requires adjusting the index by 1
-            if (newProgressiveIndex > progressiveIndex) {
-                newProgressiveIndex--;
-            }
-
-            previousSegmentLocation = newIndex;
-            previousInsert = newProgressiveIndex;
-            
             MRTFetchedResultsChangeType changeType = (index == newIndex) ? MRTFetchedResultsChangeUpdate : MRTFetchedResultsChangeMove;
             MRTFetchedResultsChangeType progressiveChangeType = (progressiveIndex == newProgressiveIndex) ? MRTFetchedResultsChangeUpdate : MRTFetchedResultsChangeMove;
 

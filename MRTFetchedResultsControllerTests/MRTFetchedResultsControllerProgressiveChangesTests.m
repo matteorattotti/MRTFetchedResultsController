@@ -947,6 +947,45 @@
     }];
 }
 
+- (void)testMoveInsert2
+{
+    Note *newObject = [NSEntityDescription insertNewObjectForEntityForName:@"Note" inManagedObjectContext:self.managedObjectContext];
+    newObject.order = @3;
+    newObject.pinned = @1;
+    newObject.text = @"3";
+    [self.targetArray addObject:newObject];
+
+    {
+        Note *newObject = [NSEntityDescription insertNewObjectForEntityForName:@"Note" inManagedObjectContext:self.managedObjectContext];
+        newObject.order = @1;
+        newObject.text = @"1";
+        [self.targetArray addObject:newObject];
+
+    }
+
+    NSSortDescriptor *pinnedSort = [[NSSortDescriptor alloc] initWithKey:@"pinned" ascending:NO];
+    NSSortDescriptor *order = [[NSSortDescriptor alloc] initWithKey:@"order" ascending:YES];
+    
+    MRTFetchedResultsController *fetchedResultsController = [self notesFetchedResultsController];
+    
+    [fetchedResultsController setSortDescriptors: @[pinnedSort, order]];
+    [fetchedResultsController performFetch:nil];
+    
+    newObject.pinned = nil;
+    {
+        Note *newObject = [NSEntityDescription insertNewObjectForEntityForName:@"Note" inManagedObjectContext:self.managedObjectContext];
+        newObject.order = @2;
+        newObject.text = @"2";
+    }
+
+    // Waiting for the did change expectation
+    [self waitForExpectationsWithTimeout:self.expectationsDefaultTimeout handler:^(NSError *error) {
+        if(error) XCTFail(@"Expectation Failed with error: %@", error);
+        
+        XCTAssertTrue([fetchedResultsController.arrangedObjects isEqualToArray:self.targetArray]);
+    }];
+}
+
 
 - (void) testMoveDelete
 {
